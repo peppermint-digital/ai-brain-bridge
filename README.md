@@ -48,16 +48,30 @@ $res = AiBrain::mcp('https://pm.peppermint-digital.com/mcp/peppermint')->callToo
 ```
 
 ### Channels — „ein Chat pro Channel"
+Läuft über den **einheitlichen MCP-Weg** (`/mcp/brain`, OAuth `mcp:use`) — dieselbe
+Schiene wie alle anderen Tools.
 ```php
-$r = AiBrain::channel('price-research')->invoke(
+// Welche Channels darf ich ansprechen?
+$channels = AiBrain::channels();                 // ['price-research', 'offer-extraction']
+
+// Anfrage in den Channel-Chat (payload und/oder Freitext)
+$r = AiBrain::channel('price-research')->message(
     ['product' => 'Hoodie STSU177', 'menge' => 23],
     ref: 'product-1234',
 );
-$thread = AiBrain::channel('price-research')->messages($r['invocation_id']);
-AiBrain::channel('price-research')->reply($r['invocation_id'], 'EK 23 €');
+$chatId = $r['chat_id'];
+
+// Status + Thread pollen (status: queued|running|needs_input|done|failed)
+$thread = AiBrain::channel('price-research')->thread($chatId);
+
+// Auf eine needs_input-Rückfrage antworten
+AiBrain::channel('price-research')->reply($chatId, 'EK 23 €');
 ```
-Der Agent schreibt Ergebnisse direkt per Produkt-MCP zurück; Rückfragen
-kommen als `channel.reply`-Event oder per Poll.
+Der Agent schreibt Ergebnisse direkt per Produkt-MCP zurück; Rückfragen kommen als
+`channel.reply`-Event oder per Poll (`status == 'needs_input'`).
+
+> `invoke()`/`messages()` bleiben als deprecated Aliase erhalten; neuer Code nutzt
+> `message()`/`thread()` und das Feld `chat_id` (nicht mehr `invocation_id`).
 
 ### Events — asynchron (beide Richtungen)
 ```php

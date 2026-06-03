@@ -58,13 +58,25 @@ class AiBrainManager
         return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30));
     }
 
-    // ── Channels ─────────────────────────────────────────────────────────
+    // ── Channels (Spezial-MCP) ───────────────────────────────────────────
 
+    /**
+     * Channel-Client für einen Channel. Läuft über den einheitlichen MCP-Weg
+     * (/mcp/brain): AiBrain::channel('price-research')->message([...]).
+     */
     public function channel(string $channel): ChannelClient
     {
-        $base = $this->config['channels']['base'] ?: rtrim((string) $this->config['base_url'], '/');
+        return new ChannelClient($this->brain(), $channel);
+    }
 
-        return new ChannelClient($base, $channel, $this->tokens);
+    /**
+     * Verfügbare (invokable) Channels — Discovery via channel-list-tool.
+     *
+     * @return array<int, string>
+     */
+    public function channels(): array
+    {
+        return (array) ($this->call('channel-list-tool')['channels'] ?? []);
     }
 
     // ── Events (Schiene 2) ───────────────────────────────────────────────
