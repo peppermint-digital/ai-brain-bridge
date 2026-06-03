@@ -20,11 +20,13 @@ class EventPublisher
         protected array $config,
         protected OAuthTokenProvider $tokens,
         protected string $source,
+        protected string $baseUrl = '',
     ) {}
 
     public function publish(Event $event): bool
     {
-        $endpoint = (string) ($this->config['endpoint'] ?? '');
+        $endpoint = (string) ($this->config['endpoint'] ?? '')
+            ?: rtrim($this->baseUrl, '/').'/api/v1/events';
         $secret = (string) ($this->config['secret'] ?? '');
 
         if ($endpoint === '') {

@@ -26,6 +26,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             (array) config('ai-brain-bridge.events'),
             $app->make(OAuthTokenProvider::class),
             (string) config('ai-brain-bridge.source'),
+            (string) config('ai-brain-bridge.base_url'),
         ));
 
         $this->app->singleton(AiBrainManager::class, fn ($app) => new AiBrainManager(
