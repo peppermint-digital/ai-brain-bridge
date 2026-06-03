@@ -80,6 +80,12 @@ Dieses Paket setzt auf `laravel/mcp` auf. Definiere deine Tools dort; AI Brain
 AI-Brain-„ConnectedProduct"-Registry (URLs, OAuth-Client, Secret).
 
 ## Status
-v0.1 — Skelett. Offene Punkte (P2): MCP-HTTP-Transport gegen den echten
-`laravel/mcp`-Streamable-HTTP verifizieren (Initialize-Handshake/Session),
-Outbox für garantierte Event-Zustellung, Tool-/Event-Katalog-Generierung.
+v0.1.
+
+✅ **MCP-Transport gegen das echte `/mcp/brain` (laravel/mcp) verifiziert**:
+`initialize` → 200 `application/json` + `MCP-Session-Id`; `tools/call`
+liefert `result.content[].text`. OAuth client-credentials (`mcp:use`)
+funktioniert. (laravel/mcp akzeptiert `tools/call` auch ohne Session.)
+
+Offen (P2): Outbox für garantierte Event-Zustellung; Tool-/Event-Katalog-
+Generierung; AI-Brain-Seite `/api/v1/events` (Event-Bus, AI-Brain Task #2116).
