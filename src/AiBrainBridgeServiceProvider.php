@@ -42,6 +42,10 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             __DIR__.'/../config/ai-brain-bridge.php' => config_path('ai-brain-bridge.php'),
         ], 'ai-brain-bridge-config');
 
+        if ($this->app->runningInConsole()) {
+            $this->commands([\Peppermint\AiBrainBridge\Console\SelftestCommand::class]);
+        }
+
         $this->registerInboundRoute();
     }
 
