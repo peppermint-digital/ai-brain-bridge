@@ -28,7 +28,9 @@ class PeerConnectionManager
      */
     public function issueClaim(?string $createdBy = null): string
     {
-        $token = Str::random(48);
+        // Token vom gebundenen Issuer (Default = SDK-Token; Produkt kann einen
+        // nativen api.token-Issuer binden → gilt auf den bestehenden /api/*).
+        $token = app(PeerTokenIssuer::class)->issue();
         $code = Str::random(48);
 
         PeerClaimCode::create([
@@ -48,11 +50,13 @@ class PeerConnectionManager
 
     /**
      * Endpoint-Seite: fremder Code → mein Bundle (einmalig). Legt den inbound-
-     * Connector an (wer darf mich rufen). Null bei ungültig/abgelaufen/eingelöst.
+     * Connector an (wer darf mich rufen). `$fromSlug` = Slug des sich verbindenden
+     * Produkts, damit die inbound-Verbindung in der UI benannt ist (nicht „—").
+     * Null bei ungültig/abgelaufen/eingelöst.
      *
      * @return array<string, mixed>|null
      */
-    public function claim(string $code): ?array
+    public function claim(string $code, ?string $fromSlug = null): ?array
     {
         $claim = PeerClaimCode::query()->where('code_hash', hash('sha256', $code))->first();
 
@@ -65,6 +69,7 @@ class PeerConnectionManager
 
         PeerConnector::create([
             'direction' => 'inbound',
+            'peer_slug' => $fromSlug,
             'token_hash' => hash('sha256', (string) $bundle['api_token']),
             'status' => 'active',
         ]);
@@ -83,7 +88,12 @@ class PeerConnectionManager
         $base = rtrim($peerUrl, '/');
 
         try {
-            $res = Http::acceptJson()->timeout(15)->post("{$base}/api/v1/connect/claim", ['code' => trim($code)]);
+            $res = Http::acceptJson()->timeout(15)->post("{$base}/api/v1/connect/claim", [
+                'code' => trim($code),
+                // Eigenen Slug mitschicken, damit der Peer die eingehende Verbindung
+                // benennen kann (sonst „—" in seiner UI).
+                'peer_slug' => (string) config('ai-brain-bridge.source'),
+            ]);
         } catch (\Throwable $e) {
             return ['ok' => false, 'peer_slug' => null, 'error' => $e->getMessage()];
         }

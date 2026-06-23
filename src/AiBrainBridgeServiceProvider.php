@@ -19,6 +19,13 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         // BEVOR die Singletons die Config lesen (Spec #249, Phase 1).
         \Peppermint\AiBrainBridge\Config\BridgeConfig::apply();
 
+        // Peer-Token-Aussteller (Phase 3b) — Default = SDK-Token. Ein Produkt
+        // überschreibt dieses Binding mit einem nativen api.token-Issuer.
+        $this->app->bind(
+            \Peppermint\AiBrainBridge\Peer\PeerTokenIssuer::class,
+            \Peppermint\AiBrainBridge\Peer\DefaultPeerTokenIssuer::class,
+        );
+
         $this->app->singleton(OAuthTokenProvider::class, fn () => new OAuthTokenProvider(
             array_merge(
                 (array) config('ai-brain-bridge.oauth'),

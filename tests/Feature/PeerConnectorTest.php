@@ -86,3 +86,25 @@ it('fails the peer client cleanly when no active connector exists', function () 
 
     expect($res['ok'])->toBeFalse()->and($res['status'])->toBe(0);
 });
+
+it('names the inbound connection with the redeeming peer slug (no more dash)', function () {
+    $mgr = app(PeerConnectionManager::class);
+    $mgr->claim($mgr->issueClaim(), 'peppermint-manager');
+
+    expect(PeerConnector::where('direction', 'inbound')->first()->peer_slug)->toBe('peppermint-manager');
+});
+
+it('uses a bound native PeerTokenIssuer for the issued token', function () {
+    app()->bind(\Peppermint\AiBrainBridge\Peer\PeerTokenIssuer::class, fn () => new class implements \Peppermint\AiBrainBridge\Peer\PeerTokenIssuer
+    {
+        public function issue(): string
+        {
+            return 'native-api-token-123';
+        }
+    });
+
+    $mgr = app(PeerConnectionManager::class);
+    $bundle = $mgr->claim($mgr->issueClaim());
+
+    expect($bundle['api_token'])->toBe('native-api-token-123');
+});

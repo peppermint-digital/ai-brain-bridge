@@ -20,9 +20,12 @@ class PeerConnectController
 
     public function claim(Request $request): JsonResponse
     {
-        $data = $request->validate(['code' => ['required', 'string', 'min:16', 'max:128']]);
+        $data = $request->validate([
+            'code' => ['required', 'string', 'min:16', 'max:128'],
+            'peer_slug' => ['nullable', 'string', 'max:100'],
+        ]);
 
-        $bundle = $this->peers->claim($data['code']);
+        $bundle = $this->peers->claim($data['code'], $data['peer_slug'] ?? null);
 
         if ($bundle === null) {
             return response()->json(['message' => 'Ungültiger, abgelaufener oder bereits eingelöster Code.'], 422);
