@@ -34,7 +34,11 @@ return [
     | `api_url` = wohin Peers MICH rufen (default: app.url).
     */
     'peer' => [
-        'enabled' => (bool) env('PEER_CONNECT', false),
+        // Standardmäßig AN — die Peer-Anbindung läuft komplett über die Produkt-UI,
+        // ohne .env-Eingriff. Der claim-Endpoint ist ohne ausgestellte Codes nur eine
+        // 422-Maschine (Token = Secret, einmalig, 15 Min). Opt-out via PEER_CONNECT=false.
+        'enabled' => filter_var(env('PEER_CONNECT', true), FILTER_VALIDATE_BOOL),
+        // Eigene API-Basis (wohin Peers MICH rufen). Default: app.url — kein .env nötig.
         'api_url' => env('PEER_API_URL'),
         'openapi_url' => env('PEER_OPENAPI_URL'),
         'claim_route' => env('PEER_CLAIM_ROUTE', '/api/v1/connect/claim'),
