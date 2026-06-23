@@ -39,8 +39,6 @@ return [
         'openapi_url' => env('PEER_OPENAPI_URL'),
         'claim_route' => env('PEER_CLAIM_ROUTE', '/api/v1/connect/claim'),
         'claim_middleware' => ['api', 'throttle:20,1'],
-        'admin_prefix' => env('PEER_ADMIN_PREFIX', 'admin/peers'),
-        'admin_middleware' => ['web'],
     ],
 
     /*

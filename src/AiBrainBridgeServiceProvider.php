@@ -65,8 +65,11 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
     }
 
     /**
-     * Peer-to-Peer-Routen (Phase 3, Track B) — nur wenn das Produkt sie aktiviert.
-     * Öffentlicher claim-Endpoint (Code = Secret) + admin-gegatete Verwaltung.
+     * Peer-to-Peer (Phase 3, Track B) — nur wenn das Produkt es aktiviert. Das SDK
+     * registriert AUSSCHLIESSLICH den öffentlichen claim-Endpoint (Code = Secret,
+     * gethrottelt, kein Auth). Die ADMIN-Aktionen (ausstellen/verbinden/widerrufen)
+     * baut jedes Produkt SELBST hinter seinem eigenen Admin-Gate — über den
+     * `PeerConnectionManager`-Service. So gibt es keinen unsicheren Default.
      */
     protected function registerPeerRoutes(): void
     {
@@ -74,24 +77,12 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             return;
         }
 
-        $controller = \Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController::class;
-
-        // Öffentlich: fremder Code → mein Bundle (gethrottelt, kein Auth).
         Route::middleware((array) config('ai-brain-bridge.peer.claim_middleware', ['api', 'throttle:20,1']))
-            ->post((string) config('ai-brain-bridge.peer.claim_route', '/api/v1/connect/claim'), [$controller, 'claim'])
+            ->post(
+                (string) config('ai-brain-bridge.peer.claim_route', '/api/v1/connect/claim'),
+                [\Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController::class, 'claim'],
+            )
             ->name('peer.connect.claim');
-
-        // Admin: ausstellen / verbinden / liste / widerrufen.
-        $prefix = trim((string) config('ai-brain-bridge.peer.admin_prefix', 'admin/peers'), '/');
-        Route::middleware((array) config('ai-brain-bridge.peer.admin_middleware', ['web']))
-            ->prefix($prefix)
-            ->name('peer.admin.')
-            ->group(function () use ($controller) {
-                Route::get('/', [$controller, 'index'])->name('index');
-                Route::post('claim-codes', [$controller, 'issue'])->name('issue');
-                Route::post('connect', [$controller, 'connect'])->name('connect');
-                Route::delete('{connector}', [$controller, 'revoke'])->name('revoke');
-            });
     }
 
     /**
