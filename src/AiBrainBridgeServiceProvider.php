@@ -54,6 +54,27 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         }
 
         $this->registerInboundRoute();
+        $this->registerConnectRoute();
+    }
+
+    /**
+     * Frontend-agnostische Connect-Route (Phase 2) — nur wenn das Produkt sie
+     * aktiviert. Middleware (inkl. Admin-Gate) kommt aus der Produkt-Config.
+     */
+    protected function registerConnectRoute(): void
+    {
+        if (! config('ai-brain-bridge.connect.enabled')) {
+            return;
+        }
+
+        $route = (string) config('ai-brain-bridge.connect.route', '/ai-brain/connect');
+        $middleware = (array) config('ai-brain-bridge.connect.middleware', ['web']);
+        $controller = \Peppermint\AiBrainBridge\Http\Controllers\ConnectController::class;
+
+        Route::middleware($middleware)->group(function () use ($route, $controller) {
+            Route::get($route, [$controller, 'status'])->name('ai-brain-bridge.connect.status');
+            Route::post($route, [$controller, 'connect'])->name('ai-brain-bridge.connect');
+        });
     }
 
     protected function registerInboundRoute(): void

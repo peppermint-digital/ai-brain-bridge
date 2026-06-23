@@ -18,6 +18,16 @@ return [
     'store_path' => env('AI_BRAIN_STORE_PATH', storage_path('app/ai-brain-bridge.json')),
 
     /*
+    | Frontend-agnostische Connect-Route (Phase 2). Standard AUS — das Produkt
+    | schaltet sie frei und MUSS eine Admin-Middleware setzen (schreibt Credentials).
+    */
+    'connect' => [
+        'enabled' => (bool) env('AI_BRAIN_CONNECT_UI', false),
+        'route' => env('AI_BRAIN_CONNECT_ROUTE', '/ai-brain/connect'),
+        'middleware' => ['web'],
+    ],
+
+    /*
     | OAuth2 client-credentials (Laravel Passport). Einheitliche Auth für
     | MCP- und Event-Calls an AI Brain. Scope mcp:use.
     */
