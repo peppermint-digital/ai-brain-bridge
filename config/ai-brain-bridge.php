@@ -28,6 +28,20 @@ return [
     ],
 
     /*
+    | Peer-to-Peer-Konnektoren (Phase 3, Track B) — Produkt↔Produkt OHNE Brain.
+    | Standard AUS. Wenn aktiv, registriert das SDK den öffentlichen claim-Endpoint
+    | (Code = Secret, gethrottelt) + die admin-gegateten Verwaltungs-Routen.
+    | `api_url` = wohin Peers MICH rufen (default: app.url).
+    */
+    'peer' => [
+        'enabled' => (bool) env('PEER_CONNECT', false),
+        'api_url' => env('PEER_API_URL'),
+        'openapi_url' => env('PEER_OPENAPI_URL'),
+        'claim_route' => env('PEER_CLAIM_ROUTE', '/api/v1/connect/claim'),
+        'claim_middleware' => ['api', 'throttle:20,1'],
+    ],
+
+    /*
     | OAuth2 client-credentials (Laravel Passport). Einheitliche Auth für
     | MCP- und Event-Calls an AI Brain. Scope mcp:use.
     */
