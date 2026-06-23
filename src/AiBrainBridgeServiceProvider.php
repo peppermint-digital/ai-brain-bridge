@@ -46,6 +46,12 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             __DIR__.'/../config/ai-brain-bridge.php' => config_path('ai-brain-bridge.php'),
         ], 'ai-brain-bridge-config');
 
+        // Peer-to-Peer-Tabellen (Phase 3) — additiv, im Produkt.
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        // Middleware-Alias, mit dem ein Produkt eigene Endpoints für Peers öffnet.
+        $this->app['router']->aliasMiddleware('peer.auth', \Peppermint\AiBrainBridge\Http\Middleware\VerifyPeerToken::class);
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \Peppermint\AiBrainBridge\Console\SelftestCommand::class,
@@ -55,6 +61,37 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
 
         $this->registerInboundRoute();
         $this->registerConnectRoute();
+        $this->registerPeerRoutes();
+    }
+
+    /**
+     * Peer-to-Peer-Routen (Phase 3, Track B) — nur wenn das Produkt sie aktiviert.
+     * Öffentlicher claim-Endpoint (Code = Secret) + admin-gegatete Verwaltung.
+     */
+    protected function registerPeerRoutes(): void
+    {
+        if (! config('ai-brain-bridge.peer.enabled')) {
+            return;
+        }
+
+        $controller = \Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController::class;
+
+        // Öffentlich: fremder Code → mein Bundle (gethrottelt, kein Auth).
+        Route::middleware((array) config('ai-brain-bridge.peer.claim_middleware', ['api', 'throttle:20,1']))
+            ->post((string) config('ai-brain-bridge.peer.claim_route', '/api/v1/connect/claim'), [$controller, 'claim'])
+            ->name('peer.connect.claim');
+
+        // Admin: ausstellen / verbinden / liste / widerrufen.
+        $prefix = trim((string) config('ai-brain-bridge.peer.admin_prefix', 'admin/peers'), '/');
+        Route::middleware((array) config('ai-brain-bridge.peer.admin_middleware', ['web']))
+            ->prefix($prefix)
+            ->name('peer.admin.')
+            ->group(function () use ($controller) {
+                Route::get('/', [$controller, 'index'])->name('index');
+                Route::post('claim-codes', [$controller, 'issue'])->name('issue');
+                Route::post('connect', [$controller, 'connect'])->name('connect');
+                Route::delete('{connector}', [$controller, 'revoke'])->name('revoke');
+            });
     }
 
     /**
