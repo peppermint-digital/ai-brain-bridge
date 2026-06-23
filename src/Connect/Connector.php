@@ -61,12 +61,19 @@ class Connector
     /**
      * Anbindungsstatus (ohne Secrets) — für die Produkt-UI.
      *
-     * @return array{connected: bool, source: string|null, base_url: string|null}
+     * `connected` spiegelt die TATSÄCHLICHE Verbindung: Client-Credentials sind
+     * konfiguriert — egal ob über `.env` (bestehende Anbindung) oder über den
+     * Claim-Store (`ai-brain:connect`). `via` macht die Quelle transparent.
+     *
+     * @return array{connected: bool, via: string, source: string|null, base_url: string|null}
      */
     public function status(): array
     {
+        $hasClient = ! empty(config('ai-brain-bridge.oauth.client_id'));
+
         return [
-            'connected' => BridgeConfig::load() !== null && ! empty(config('ai-brain-bridge.oauth.client_id')),
+            'connected' => $hasClient,
+            'via' => ! $hasClient ? 'none' : (BridgeConfig::load() !== null ? 'claim' : 'env'),
             'source' => config('ai-brain-bridge.source'),
             'base_url' => config('ai-brain-bridge.base_url'),
         ];

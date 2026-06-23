@@ -58,7 +58,18 @@ it('reflects connection status', function () {
     fakeClaimOk();
     app(Connector::class)->connect('CLAIMCODE12345678', 'https://brain.test');
 
-    expect(app(Connector::class)->status()['connected'])->toBeTrue();
+    $status = app(Connector::class)->status();
+    expect($status['connected'])->toBeTrue()
+        ->and($status['via'])->toBe('claim');
+});
+
+it('reports connected via env when client_id is set without a claim store', function () {
+    config()->set('ai-brain-bridge.oauth.client_id', 'env-cid');
+
+    $status = app(Connector::class)->status();
+
+    expect($status['connected'])->toBeTrue()
+        ->and($status['via'])->toBe('env');
 });
 
 it('connects via the HTTP controller (200)', function () {
