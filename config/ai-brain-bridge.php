@@ -12,6 +12,12 @@ return [
     'source' => env('AI_BRAIN_PRODUCT_SLUG', env('APP_NAME', 'unknown')),
 
     /*
+    | Settings-Store der One-Click-Anbindung (`ai-brain:connect`). Das per Claim-
+    | Code bezogene Bundle landet hier und überlagert beim Boot die ENV-Defaults.
+    */
+    'store_path' => env('AI_BRAIN_STORE_PATH', storage_path('app/ai-brain-bridge.json')),
+
+    /*
     | OAuth2 client-credentials (Laravel Passport). Einheitliche Auth für
     | MCP- und Event-Calls an AI Brain. Scope mcp:use.
     */

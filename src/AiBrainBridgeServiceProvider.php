@@ -15,6 +15,10 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/ai-brain-bridge.php', 'ai-brain-bridge');
 
+        // One-Click-Anbindung: gespeichertes Bundle über die ENV-Defaults legen,
+        // BEVOR die Singletons die Config lesen (Spec #249, Phase 1).
+        \Peppermint\AiBrainBridge\Config\BridgeConfig::apply();
+
         $this->app->singleton(OAuthTokenProvider::class, fn () => new OAuthTokenProvider(
             array_merge(
                 (array) config('ai-brain-bridge.oauth'),
@@ -43,7 +47,10 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         ], 'ai-brain-bridge-config');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([\Peppermint\AiBrainBridge\Console\SelftestCommand::class]);
+            $this->commands([
+                \Peppermint\AiBrainBridge\Console\SelftestCommand::class,
+                \Peppermint\AiBrainBridge\Console\ConnectCommand::class,
+            ]);
         }
 
         $this->registerInboundRoute();
