@@ -21,15 +21,41 @@ use Peppermint\AiBrainBridge\Mcp\McpClient;
 class AiBrainManager
 {
     /**
+     * Acting-User-Resolver (Connector Phase 4.1): liefert die E-Mail des aktuell
+     * eingeloggten Produkt-Users oder null. Default aus der Config, zur Laufzeit
+     * via resolveActingUserUsing() überschreibbar.
+     *
+     * @var (callable(): ?string)|null
+     */
+    protected $actingUserResolver;
+
+    /**
      * @param  array<string, mixed>  $config
      */
     public function __construct(
         protected array $config,
         protected OAuthTokenProvider $tokens,
         protected EventPublisher $publisher,
-    ) {}
+    ) {
+        $resolver = $config['acting_user']['resolver'] ?? null;
+        $this->actingUserResolver = is_callable($resolver) ? $resolver : null;
+    }
 
     // ── MCP (Schiene 1) ──────────────────────────────────────────────────
+
+    /**
+     * Setzt den Acting-User-Resolver zur Laufzeit (Alternative zur Config).
+     * Das Produkt darf NUR den authentifizierten User behaupten:
+     * AiBrain::resolveActingUserUsing(fn () => auth()->user()?->email);
+     *
+     * @param  (callable(): ?string)|null  $resolver
+     */
+    public function resolveActingUserUsing(?callable $resolver): self
+    {
+        $this->actingUserResolver = $resolver;
+
+        return $this;
+    }
 
     /**
      * Ruft ein AI-Brain-MCP-Tool auf (z.B. create-task-tool, list-projects-tool).
@@ -47,7 +73,7 @@ class AiBrainManager
         $url = $this->config['mcp']['brain_url']
             ?: rtrim((string) $this->config['base_url'], '/').'/mcp/brain';
 
-        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30));
+        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), $this->actingUserResolver);
     }
 
     /**
@@ -55,7 +81,7 @@ class AiBrainManager
      */
     public function mcp(string $url): McpClient
     {
-        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30));
+        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), $this->actingUserResolver);
     }
 
     // ── Channels (Spezial-MCP) ───────────────────────────────────────────

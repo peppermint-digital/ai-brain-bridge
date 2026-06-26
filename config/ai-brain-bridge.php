@@ -66,6 +66,26 @@ return [
     ],
 
     /*
+    | Acting-User-Delegation (Connector Phase 4.1). Das Produkt deklariert pro
+    | MCP-Call den handelnden End-User; Brain handelt dann als dieser User statt
+    | als Owner (korrekte Attribution + Sichtbarkeit/Rechte).
+    |
+    | `resolver` ist ein Callback (?callable): liefert die E-Mail des aktuell
+    | eingeloggten Produkt-Users — oder null bei Hintergrund-/System-Jobs.
+    | null (Default) ⇒ kein Header ⇒ alles läuft als Owner (heutiges Verhalten).
+    |
+    | WICHTIG: Das Produkt darf NUR den authentifizierten User behaupten
+    | (z.B. fn () => auth()->user()?->email), niemals ungeprüften Input. Greift
+    | nur, wenn das Produkt in Brain `allow_acting_user` aktiviert hat.
+    |
+    | Alternativ zur Config kann das Produkt den Resolver zur Laufzeit setzen:
+    | AiBrain::resolveActingUserUsing(fn () => auth()->user()?->email);
+    */
+    'acting_user' => [
+        'resolver' => null,
+    ],
+
+    /*
     | Channels (Spezialfall MCP/REST): price-research, offer, …
     */
     'channels' => [

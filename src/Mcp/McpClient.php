@@ -19,12 +19,23 @@ use Peppermint\AiBrainBridge\Exceptions\AiBrainBridgeException;
  */
 class McpClient
 {
+    /**
+     * Header, mit dem das Produkt den handelnden End-User behauptet
+     * (Acting-User-Delegation, Connector Phase 4.1).
+     */
+    public const ACTING_USER_HEADER = 'X-AI-Brain-Acting-User';
+
     protected ?string $sessionId = null;
 
+    /**
+     * @param  (callable(): ?string)|null  $actingUserResolver  Liefert die E-Mail
+     *         des aktuell eingeloggten Produkt-Users oder null (kein Header → Owner).
+     */
     public function __construct(
         protected string $endpoint,
         protected OAuthTokenProvider $tokens,
         protected int $timeout = 30,
+        protected $actingUserResolver = null,
     ) {}
 
     /**
@@ -99,7 +110,28 @@ class McpClient
             ->acceptJson()
             ->withHeaders(['Content-Type' => 'application/json']);
 
+        if (($email = $this->actingUserEmail()) !== null) {
+            $req = $req->withHeaders([self::ACTING_USER_HEADER => $email]);
+        }
+
         return $this->sessionId ? $req->withHeaders(['Mcp-Session-Id' => $this->sessionId]) : $req;
+    }
+
+    /**
+     * Aktuelle Acting-User-E-Mail über den Resolver — pro Request frisch
+     * ausgewertet (eingeloggter User kann zwischen Calls wechseln). Liefert
+     * null bei fehlendem Resolver, Hintergrund-Jobs oder leerem Ergebnis.
+     */
+    protected function actingUserEmail(): ?string
+    {
+        if (! is_callable($this->actingUserResolver)) {
+            return null;
+        }
+
+        $email = ($this->actingUserResolver)();
+        $email = is_string($email) ? trim($email) : '';
+
+        return $email !== '' ? $email : null;
     }
 
     /**
