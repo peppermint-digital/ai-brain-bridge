@@ -11,17 +11,19 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property string $code_hash
  * @property array<string, mixed> $bundle
+ * @property string|null $issuer_ref
  */
 class PeerClaimCode extends Model
 {
     protected $fillable = [
-        'code_hash', 'bundle', 'expires_at', 'used_at', 'created_by',
+        'code_hash', 'bundle', 'issuer_ref', 'expires_at', 'used_at', 'created_by',
     ];
 
     protected function casts(): array
     {
         return [
             'bundle' => 'encrypted:array',
+            'issuer_ref' => 'encrypted',
             'expires_at' => 'datetime',
             'used_at' => 'datetime',
         ];

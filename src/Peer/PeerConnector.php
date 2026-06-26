@@ -11,18 +11,24 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property string $direction
  * @property string|null $api_token
+ * @property array<int, string>|null $scopes
+ * @property string|null $issued_token_ref
+ * @property int|null $replaced_by_id
  */
 class PeerConnector extends Model
 {
     protected $fillable = [
         'direction', 'peer_slug', 'api_url', 'token_hash', 'api_token',
-        'openapi_url', 'status', 'revoked_at', 'created_by',
+        'openapi_url', 'scopes', 'issued_token_ref', 'replaced_by_id',
+        'status', 'revoked_at', 'created_by',
     ];
 
     protected function casts(): array
     {
         return [
             'api_token' => 'encrypted',
+            'scopes' => 'array',
+            'issued_token_ref' => 'encrypted',
             'revoked_at' => 'datetime',
         ];
     }
@@ -30,6 +36,19 @@ class PeerConnector extends Model
     public function isActive(): bool
     {
         return $this->status === 'active' && $this->revoked_at === null;
+    }
+
+    /**
+     * Darf diese Verbindung die gegebene Operation? Leere/keine Scopes = voller
+     * Zugriff (rückwärtskompatibel). Sonst muss der Scope explizit erteilt sein.
+     */
+    public function allowsScope(string $scope): bool
+    {
+        if (empty($this->scopes)) {
+            return true;
+        }
+
+        return in_array($scope, $this->scopes, true);
     }
 
     /** @param  \Illuminate\Database\Eloquent\Builder<self>  $query */
