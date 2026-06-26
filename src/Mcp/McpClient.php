@@ -25,17 +25,26 @@ class McpClient
      */
     public const ACTING_USER_HEADER = 'X-AI-Brain-Acting-User';
 
+    /**
+     * Optionale HMAC-Signatur der Acting-User-Assertion (Phase 4.2,
+     * Defense-in-depth). sha256=<hex> über die E-Mail, mit dem Event-Secret.
+     */
+    public const ACTING_SIG_HEADER = 'X-AI-Brain-Acting-Sig';
+
     protected ?string $sessionId = null;
 
     /**
      * @param  (callable(): ?string)|null  $actingUserResolver  Liefert die E-Mail
      *         des aktuell eingeloggten Produkt-Users oder null (kein Header → Owner).
+     * @param  string|null  $actingSignatureSecret  Globales Event-Secret; wenn gesetzt,
+     *         wird die Acting-User-Assertion zusätzlich HMAC-signiert.
      */
     public function __construct(
         protected string $endpoint,
         protected OAuthTokenProvider $tokens,
         protected int $timeout = 30,
         protected $actingUserResolver = null,
+        protected ?string $actingSignatureSecret = null,
     ) {}
 
     /**
@@ -112,6 +121,12 @@ class McpClient
 
         if (($email = $this->actingUserEmail()) !== null) {
             $req = $req->withHeaders([self::ACTING_USER_HEADER => $email]);
+
+            if (is_string($this->actingSignatureSecret) && $this->actingSignatureSecret !== '') {
+                $req = $req->withHeaders([
+                    self::ACTING_SIG_HEADER => 'sha256='.hash_hmac('sha256', $email, $this->actingSignatureSecret),
+                ]);
+            }
         }
 
         return $this->sessionId ? $req->withHeaders(['Mcp-Session-Id' => $this->sessionId]) : $req;

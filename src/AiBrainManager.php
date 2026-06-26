@@ -58,6 +58,18 @@ class AiBrainManager
     }
 
     /**
+     * Globales Event-Secret zum Signieren der Acting-User-Assertion (Phase 4.2).
+     * Null/leer ⇒ keine Signatur (Brain erzwingt sie nur, wenn das Produkt es
+     * via require_acting_user_signature aktiviert hat).
+     */
+    protected function actingSignatureSecret(): ?string
+    {
+        $secret = $this->config['events']['secret'] ?? null;
+
+        return is_string($secret) && $secret !== '' ? $secret : null;
+    }
+
+    /**
      * Ruft ein AI-Brain-MCP-Tool auf (z.B. create-task-tool, list-projects-tool).
      *
      * @param  array<string, mixed>  $arguments
@@ -73,7 +85,7 @@ class AiBrainManager
         $url = $this->config['mcp']['brain_url']
             ?: rtrim((string) $this->config['base_url'], '/').'/mcp/brain';
 
-        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), $this->actingUserResolver);
+        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), $this->actingUserResolver, $this->actingSignatureSecret());
     }
 
     /**
@@ -81,7 +93,7 @@ class AiBrainManager
      */
     public function mcp(string $url): McpClient
     {
-        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), $this->actingUserResolver);
+        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), $this->actingUserResolver, $this->actingSignatureSecret());
     }
 
     // ── Channels (Spezial-MCP) ───────────────────────────────────────────

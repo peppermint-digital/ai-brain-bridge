@@ -64,6 +64,30 @@ it('hängt KEINEN Header an, wenn der Resolver null liefert (Hintergrund-Job)', 
         && ! $request->hasHeader(McpClient::ACTING_USER_HEADER));
 });
 
+it('signiert die Acting-User-Assertion mit dem Event-Secret', function () {
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
+
+    AiBrain::call('create-task-tool', ['title' => 'X']);
+
+    $expected = 'sha256='.hash_hmac('sha256', 'martin@example.test', 'shared-secret');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/mcp/brain')
+        && str_contains($request->body(), 'create-task-tool')
+        && $request->hasHeader(McpClient::ACTING_SIG_HEADER, $expected));
+});
+
+it('signiert NICHT ohne Event-Secret', function () {
+    config()->set('ai-brain-bridge.events.secret', '');
+    AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
+
+    AiBrain::call('list-projects-tool');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/mcp/brain')
+        && $request->hasHeader(McpClient::ACTING_USER_HEADER, 'martin@example.test')
+        && ! $request->hasHeader(McpClient::ACTING_SIG_HEADER));
+});
+
 it('liest den Resolver aus der Config', function () {
     config()->set('ai-brain-bridge.acting_user.resolver', fn () => 'configured@example.test');
 
