@@ -3,6 +3,7 @@
 namespace Peppermint\AiBrainBridge\Connect;
 
 use Illuminate\Support\Facades\Http;
+use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
 use Peppermint\AiBrainBridge\Config\BridgeConfig;
 
 /**
@@ -54,6 +55,14 @@ class Connector
         ]);
 
         BridgeConfig::apply();
+
+        // Neuen Bundle-Kontext sofort scharf schalten: das gecachte
+        // client-credentials-Access-Token stammt noch vom ALTEN Client und würde
+        // bis zum TTL-Ablauf (≤1h) weiterverwendet. Wird der alte Client danach
+        // im Hub widerrufen, führt das stale Token zu 401 (Transcription/MCP
+        // brechen, während der Status weiter „verbunden" meldet). Cache leeren →
+        // der nächste token()-Call prägt frisch mit den neuen Store-Creds.
+        app(OAuthTokenProvider::class)->forget();
 
         return ['ok' => true, 'product_slug' => $b['product_slug'] ?? null, 'error' => null];
     }

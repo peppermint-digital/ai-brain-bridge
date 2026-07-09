@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Peppermint\AiBrainBridge\Connect\Connector;
 use Peppermint\AiBrainBridge\Http\Controllers\ConnectController;
@@ -40,6 +41,19 @@ it('connects and applies config via the Connector service', function () {
         ->and($result['product_slug'])->toBe('shop')
         ->and(config('ai-brain-bridge.oauth.client_id'))->toBe('cid-9')
         ->and(config('ai-brain-bridge.events.secret'))->toBe('evt-9');
+});
+
+it('clears the cached client-credentials token on (re)connect', function () {
+    // Stale Token aus einem vorherigen (alten) Client im Cache.
+    Cache::put('ai_brain_bridge.oauth_token', 'stale-token-from-old-client', 3600);
+    expect(Cache::has('ai_brain_bridge.oauth_token'))->toBeTrue();
+
+    fakeClaimOk();
+    app(Connector::class)->connect('CLAIMCODE12345678', 'https://brain.test');
+
+    // Nach dem Reconnect darf das alte Token nicht überleben — sonst würde der
+    // nächste Call weiter mit dem alten (ggf. widerrufenen) Client authentifizieren.
+    expect(Cache::has('ai_brain_bridge.oauth_token'))->toBeFalse();
 });
 
 it('reports a connect failure without throwing', function () {
