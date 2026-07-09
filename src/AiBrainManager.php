@@ -70,6 +70,38 @@ class AiBrainManager
     }
 
     /**
+     * Acting-User-Header für Direkt-HTTP-Aufrufe, die den McpClient umgehen
+     * (z.B. Voice-Transcription gegen /api/v1/transcribe). Liefert denselben
+     * `X-AI-Brain-Acting-User`(+ `-Sig`)-Header wie der McpClient — oder ein
+     * leeres Array (kein Resolver / Hintergrund-Job / leere E-Mail) ⇒ der Call
+     * läuft als Owner (heutiges Verhalten). Nur den authentifizierten User
+     * durchreichen — der Resolver darf niemals ungeprüften Input liefern.
+     *
+     * @return array<string, string>
+     */
+    public function actingUserHeaders(): array
+    {
+        if (! is_callable($this->actingUserResolver)) {
+            return [];
+        }
+
+        $email = ($this->actingUserResolver)();
+        $email = is_string($email) ? trim($email) : '';
+
+        if ($email === '') {
+            return [];
+        }
+
+        $headers = [McpClient::ACTING_USER_HEADER => $email];
+
+        if (($secret = $this->actingSignatureSecret()) !== null) {
+            $headers[McpClient::ACTING_SIG_HEADER] = 'sha256='.hash_hmac('sha256', $email, $secret);
+        }
+
+        return $headers;
+    }
+
+    /**
      * Ruft ein AI-Brain-MCP-Tool auf (z.B. create-task-tool, list-projects-tool).
      *
      * @param  array<string, mixed>  $arguments

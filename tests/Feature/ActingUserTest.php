@@ -88,6 +88,34 @@ it('signiert NICHT ohne Event-Secret', function () {
         && ! $request->hasHeader(McpClient::ACTING_SIG_HEADER));
 });
 
+it('actingUserHeaders() ist leer ohne Resolver (Direkt-HTTP läuft als Owner)', function () {
+    expect(AiBrain::actingUserHeaders())->toBe([]);
+});
+
+it('actingUserHeaders() liefert den Acting-User-Header, wenn der Resolver greift', function () {
+    AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
+
+    expect(AiBrain::actingUserHeaders())
+        ->toBe([McpClient::ACTING_USER_HEADER => 'martin@example.test']);
+});
+
+it('actingUserHeaders() signiert mit dem Event-Secret', function () {
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
+    AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
+
+    expect(AiBrain::actingUserHeaders())->toBe([
+        McpClient::ACTING_USER_HEADER => 'martin@example.test',
+        McpClient::ACTING_SIG_HEADER => 'sha256='.hash_hmac('sha256', 'martin@example.test', 'shared-secret'),
+    ]);
+});
+
+it('actingUserHeaders() ist leer, wenn der Resolver null liefert (Hintergrund-Job)', function () {
+    AiBrain::resolveActingUserUsing(fn () => null);
+
+    expect(AiBrain::actingUserHeaders())->toBe([]);
+});
+
 it('liest den Resolver aus der Config', function () {
     config()->set('ai-brain-bridge.acting_user.resolver', fn () => 'configured@example.test');
 

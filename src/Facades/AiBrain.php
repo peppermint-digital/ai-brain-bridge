@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static array call(string $tool, array $arguments = [])
+ * @method static \Peppermint\AiBrainBridge\AiBrainManager resolveActingUserUsing(?callable $resolver)
+ * @method static array actingUserHeaders()
  * @method static \Peppermint\AiBrainBridge\Mcp\McpClient brain()
  * @method static \Peppermint\AiBrainBridge\Mcp\McpClient mcp(string $url)
  * @method static \Peppermint\AiBrainBridge\Channels\ChannelClient channel(string $channel)
