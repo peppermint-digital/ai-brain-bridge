@@ -16,6 +16,20 @@ Kommunikationslayer (v1)"** in AI Brain.
 
 Produkte reden **nur** mit AI Brain, nie direkt miteinander.
 
+## Identitäts-Modi — Service vs. User
+
+Jeder Call läuft unter einer von zwei Identitäten (Wahl **pro Call**, ein Produkt
+nutzt meist beide):
+
+- **Service** (userlos) — für Monitoring, Health-Checks, Background/Infra. Kein
+  Acting-User, die Identität ist der Client selbst. Automatisch in Konsole/Queue,
+  explizit via `AiBrain::asService(fn () => …)`.
+- **User** (Delegation) — für Aktionen echter End-Nutzer. Das SDK schickt den
+  aktuellen Nutzer (signiert), AI Brain handelt in dessen Namen.
+
+📖 **Ausführlich mit Beispielen, Entscheidungsbaum und der „asService()-Goldregel":
+[`docs/identity-modes.md`](docs/identity-modes.md).**
+
 ## Installation
 
 ```bash
