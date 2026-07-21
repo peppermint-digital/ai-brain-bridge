@@ -58,6 +58,34 @@ class AiBrainManager
     }
 
     /**
+     * Führt $callback als SERVICE aus — ohne Acting-User-Delegation. Für
+     * Health-Checks, Infra- und Hintergrund-Calls (kein End-User im Spiel):
+     * sie laufen dann als Service-Principal in AI Brain, nicht als der zufällig
+     * eingeloggte Mensch. Der Resolver wird nur für die Dauer des Callbacks
+     * unterdrückt und im finally IMMER wiederhergestellt (kein globaler Leak).
+     *
+     * Der Connector nutzt diesen Weg implizit (Push aus der Konsole, kein User);
+     * User-Aktionen bleiben delegiert. So ist der Zwei-Modi-Weg für ALLE Produkte
+     * einheitlich:  AiBrain::asService(fn () => AiBrain::channels()).
+     *
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public function asService(callable $callback)
+    {
+        $previous = $this->actingUserResolver;
+        $this->actingUserResolver = null;
+
+        try {
+            return $callback();
+        } finally {
+            $this->actingUserResolver = $previous;
+        }
+    }
+
+    /**
      * Globales Event-Secret zum Signieren der Acting-User-Assertion (Phase 4.2).
      * Null/leer ⇒ keine Signatur (Brain erzwingt sie nur, wenn das Produkt es
      * via require_acting_user_signature aktiviert hat).
