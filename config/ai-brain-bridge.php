@@ -109,6 +109,11 @@ return [
     | Inbound-Webhook: AI Brain → dieses Produkt. Signaturgeprüft, idempotent.
     */
     'inbound' => [
+        // Gegenrichtung (#471): Auf welches Modell wird die von AI Brain
+        // behauptete Acting-User-E-Mail gemappt? Produkte mit abweichendem
+        // Mapping nutzen stattdessen AiBrain::resolveInboundUserUsing().
+        'user_model' => env('AI_BRAIN_INBOUND_USER_MODEL', 'App\\Models\\User'),
+
         'route' => env('AI_BRAIN_WEBHOOK_ROUTE', '/webhooks/ai-brain'),
         'middleware' => ['api'],
         'idempotency_ttl' => (int) env('AI_BRAIN_IDEMPOTENCY_TTL', 86400),

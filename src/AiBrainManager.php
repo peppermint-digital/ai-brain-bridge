@@ -30,6 +30,17 @@ class AiBrainManager
     protected $actingUserResolver;
 
     /**
+     * Gegenrichtung (#471): AI Brain ruft UNSEREN MCP-Server auf und behauptet
+     * pro Nachricht, wer gerade schreibt. Dieser Resolver mappt die behauptete
+     * E-Mail auf das lokale Nutzer-Objekt. Default: `App\Models\User` per
+     * E-Mail — Produkte mit abweichendem Mapping (z.B. `ai_brain_user_id`)
+     * überschreiben ihn via resolveInboundUserUsing().
+     *
+     * @var (callable(string): mixed)|null
+     */
+    protected $inboundUserResolver;
+
+    /**
      * @param  array<string, mixed>  $config
      */
     public function __construct(
@@ -55,6 +66,49 @@ class AiBrainManager
         $this->actingUserResolver = $resolver;
 
         return $this;
+    }
+
+    /**
+     * Setzt den Inbound-Resolver zur Laufzeit:
+     * AiBrain::resolveInboundUserUsing(fn (string $email) => User::where('email', $email)->first());
+     *
+     * @param  (callable(string): mixed)|null  $resolver
+     */
+    public function resolveInboundUserUsing(?callable $resolver): self
+    {
+        $this->inboundUserResolver = $resolver;
+
+        return $this;
+    }
+
+    /**
+     * Löst die von AI Brain behauptete E-Mail auf ein lokales Nutzer-Objekt auf.
+     * Kein Treffer ⇒ null; der Aufruf läuft dann unverändert weiter (Zuschreibung
+     * ist best-effort, siehe Middleware).
+     */
+    public function resolveInboundUser(string $email)
+    {
+        if ($this->inboundUserResolver !== null) {
+            return ($this->inboundUserResolver)($email);
+        }
+
+        $model = $this->config['inbound']['user_model'] ?? 'App\\Models\\User';
+
+        if (! is_string($model) || ! class_exists($model)) {
+            return null;
+        }
+
+        return $model::query()->where('email', $email)->first();
+    }
+
+    /**
+     * Das geteilte Secret, mit dem AI Brain die Acting-User-Behauptung signiert —
+     * dasselbe wie beim Signieren ausgehend. Öffentlich, damit die Inbound-
+     * Middleware prüfen kann, ohne die Config erneut zu interpretieren.
+     */
+    public function actingSecret(): ?string
+    {
+        return $this->actingSignatureSecret();
     }
 
     /**

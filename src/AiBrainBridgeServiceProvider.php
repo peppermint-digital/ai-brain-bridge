@@ -59,6 +59,11 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         // Middleware-Alias, mit dem ein Produkt eigene Endpoints für Peers öffnet.
         $this->app['router']->aliasMiddleware('peer.auth', \Peppermint\AiBrainBridge\Http\Middleware\VerifyPeerToken::class);
 
+        // Eingehende Acting-User-Delegation (#471): hinter die MCP-Auth des
+        // Produkts hängen, dann handelt der MCP-Aufruf als der Mensch, der die
+        // Nachricht geschrieben hat — statt als Token-Besitzer.
+        $this->app['router']->aliasMiddleware('ai-brain.acting-user', \Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser::class);
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \Peppermint\AiBrainBridge\Console\SelftestCommand::class,
