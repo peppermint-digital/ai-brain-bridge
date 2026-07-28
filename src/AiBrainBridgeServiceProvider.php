@@ -64,6 +64,11 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         // Nachricht geschrieben hat — statt als Token-Besitzer.
         $this->app['router']->aliasMiddleware('ai-brain.acting-user', \Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser::class);
 
+        // Dasselbe zwischen zwei Produkten (#3459): hinter die API-Auth hängen,
+        // dann trägt ein Peer-Aufruf den Menschen, der ihn ausgelöst hat, statt
+        // gar niemanden. Persönliche Tokens bleiben unberührt.
+        $this->app['router']->aliasMiddleware('peer.acting-user', \Peppermint\AiBrainBridge\Http\Middleware\ResolvePeerActingUser::class);
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \Peppermint\AiBrainBridge\Console\SelftestCommand::class,

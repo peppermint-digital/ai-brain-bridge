@@ -114,6 +114,33 @@ die zeigen, welche Modi es tatsächlich nutzt:
 
 Ein Produkt kann **beide** tragen.
 
+## Produkt ↔ Produkt (Peer-Verbindungen)
+
+Zwischen zwei Produkten gilt dasselbe Modell — mit einem Unterschied im
+Ausgangspunkt: Eine Peer-Verbindung ist **keine Person**. Der Token sagt, welches
+*Produkt* anruft, nicht wer dort gehandelt hat. Ohne Delegation entstehen beim
+aufgerufenen Produkt deshalb Datensätze **ohne Urheber**.
+
+Der `PeerClient` schickt daher dieselben Header wie der `McpClient` zum Brain,
+signiert mit demselben geteilten Event-Secret. Das aufgerufene Produkt hängt
+
+    Route::middleware(['<eigene-api-auth>', 'peer.acting-user'])->…
+
+hinter seine API-Authentifizierung. Unter `AiBrain::asService(…)` bleiben die
+Header leer, Hintergrund-Aufrufe also identitätslos.
+
+**Wichtiger Unterschied zu `ai-brain.acting-user`:** Der Header wird nur beachtet,
+wenn der Aufruf noch zu keiner Person gehört. Ein persönlicher API-Token behält
+seine Identität und kann sich nicht per Header umschreiben — sonst wäre die
+Trennung zwischen Systemverbindung und Person wieder aufgehoben, nur an anderer
+Stelle.
+
+Wie beim Brain-Pendant ist das **Zuschreibung, keine Autorisierung**: eine
+unbekannte E-Mail oder eine falsche Signatur verwerfen den Header, blockieren den
+Aufruf aber nicht.
+
+---
+
 Siehe auch: [../README.md](../README.md), der `ai-brain/laravel-connector`
 (reiner Service-Modus-Verbraucher) und die Wiki-Seite „Einheitlicher
 Kommunikationslayer" in AI Brain.

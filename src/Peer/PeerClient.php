@@ -4,6 +4,7 @@ namespace Peppermint\AiBrainBridge\Peer;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Peppermint\AiBrainBridge\Facades\AiBrain;
 
 /**
  * Generischer REST-Client, mit dem DIESES Produkt einen verbundenen Peer direkt
@@ -38,7 +39,16 @@ class PeerClient
         $url = rtrim((string) $connector->api_url, '/').'/'.ltrim($path, '/');
 
         try {
-            $req = Http::acceptJson()->timeout($this->timeoutSeconds)->withToken((string) $connector->api_token);
+            // Der Peer-Token sagt, WELCHES Produkt anruft — nicht, wer dort
+            // gehandelt hat. Seit die Systemverbindung bewusst ohne Person
+            // läuft, entstünden beim Peer sonst Datensätze ohne Urheber.
+            // Dieselben Header wie zum Brain (McpClient), dieselbe HMAC über
+            // das geteilte Event-Secret; unter AiBrain::asService() bleiben sie
+            // leer, damit Hintergrund-Aufrufe identitätslos bleiben.
+            $req = Http::acceptJson()
+                ->timeout($this->timeoutSeconds)
+                ->withToken((string) $connector->api_token)
+                ->withHeaders(AiBrain::actingUserHeaders());
 
             $res = match (strtoupper($method)) {
                 'GET' => $req->get($url, $data),
