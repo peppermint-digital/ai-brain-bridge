@@ -110,3 +110,26 @@ it('lässt Aufrufe ohne Header unverändert durch', function () {
 
     $this->get('/_test/who')->assertOk()->assertSee('niemand');
 });
+
+it('stellt die Herkunft (Channel) fuer das Audit bereit', function () {
+    // Rein zur Zuschreibung: „ueber welchen Weg kam das?" — auch ohne Menschen
+    // dahinter. Bewusst KEIN Rechte-Input, sonst muesste jedes Produkt die
+    // Channel-Verwaltung nachbauen.
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+
+    Route::middleware(ResolveAiBrainActingUser::class)->get('/_test/channel', fn () => response(
+        AiBrain::inboundChannel() ?? 'unbekannt'
+    ));
+
+    $this->get('/_test/channel', [ResolveAiBrainActingUser::CHANNEL_HEADER => 'outreach-mail'])
+        ->assertOk()
+        ->assertSee('outreach-mail');
+});
+
+it('meldet keine Herkunft, wenn der Aufruf nicht von AI Brain kommt', function () {
+    Route::middleware(ResolveAiBrainActingUser::class)->get('/_test/channel', fn () => response(
+        AiBrain::inboundChannel() ?? 'unbekannt'
+    ));
+
+    $this->get('/_test/channel')->assertOk()->assertSee('unbekannt');
+});

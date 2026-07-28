@@ -37,10 +37,29 @@ class ResolveAiBrainActingUser
     public const ACTING_SIG_HEADER = 'X-AI-Brain-Acting-Sig';
 
     /**
+     * Herkunft des Aufrufs (AI-Brain-Channel). Rein für die ZUSCHREIBUNG —
+     * beantwortet im Audit „über welchen Weg kam das?", auch wenn kein Mensch
+     * dahinterstand (Automatisierung, geplanter Task).
+     *
+     * Bewusst KEIN Autorisierungs-Input: Würde ein Produkt daraus Rechte
+     * ableiten, müsste die Channel-Verwaltung in jedem Produkt nachgebaut und
+     * gepflegt werden. Diese Entscheidung gehört nach AI Brain, wo die Channels
+     * ohnehin verwaltet werden.
+     */
+    public const CHANNEL_HEADER = 'X-AI-Brain-Channel';
+
+    /** Request-Attribut, unter dem die Herkunft für die App bereitliegt. */
+    public const CHANNEL_ATTRIBUTE = 'ai_brain_channel';
+
+    /**
      * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
+        if (($channel = trim((string) $request->header(self::CHANNEL_HEADER, ''))) !== '') {
+            $request->attributes->set(self::CHANNEL_ATTRIBUTE, $channel);
+        }
+
         $asserted = trim((string) $request->header(self::ACTING_USER_HEADER, ''));
 
         if ($asserted !== '' && $this->signatureValid($request, $asserted)) {

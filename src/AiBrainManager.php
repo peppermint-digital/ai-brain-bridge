@@ -112,6 +112,20 @@ class AiBrainManager
     }
 
     /**
+     * Aus welchem AI-Brain-Channel kam der aktuelle eingehende Aufruf? `null`
+     * bei allem, was nicht von dort stammt. Für Audit-/Zuschreibungszwecke
+     * gedacht, NICHT für Rechteentscheidungen (siehe Middleware-Doc).
+     */
+    public function inboundChannel(): ?string
+    {
+        $channel = request()->attributes->get(
+            \Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser::CHANNEL_ATTRIBUTE
+        );
+
+        return is_string($channel) && $channel !== '' ? $channel : null;
+    }
+
+    /**
      * Führt $callback als SERVICE aus — ohne Acting-User-Delegation. Für
      * Health-Checks, Infra- und Hintergrund-Calls (kein End-User im Spiel):
      * sie laufen dann als Service-Principal in AI Brain, nicht als der zufällig
