@@ -34,17 +34,21 @@ class McpClient
     protected ?string $sessionId = null;
 
     /**
-     * @param  (callable(): ?string)|null  $actingUserResolver  Liefert die E-Mail
-     *         des aktuell eingeloggten Produkt-Users oder null (kein Header → Owner).
-     * @param  string|null  $actingSignatureSecret  Globales Event-Secret; wenn gesetzt,
-     *         wird die Acting-User-Assertion zusätzlich HMAC-signiert.
+     * @param  (callable(): array<string, string>)|null  $actingHeaders  Liefert die
+     *         fertigen Acting-User-Header für den aktuellen Call (leeres Array =
+     *         ausdrücklicher Systemaufruf ohne handelnde Person).
+     *
+     *         Bewusst fertige Header statt einer E-Mail: wer die Person bestimmt
+     *         und wie die Assertion signiert wird, entscheidet ausschliesslich
+     *         {@see \Peppermint\AiBrainBridge\AiBrainManager::actingUserHeaders()}.
+     *         Vorher stand dieselbe Logik hier ein zweites Mal — zwei Stellen,
+     *         die auseinanderlaufen konnten, ohne dass es auffällt.
      */
     public function __construct(
         protected string $endpoint,
         protected OAuthTokenProvider $tokens,
         protected int $timeout = 30,
-        protected $actingUserResolver = null,
-        protected ?string $actingSignatureSecret = null,
+        protected $actingHeaders = null,
     ) {}
 
     /**
@@ -119,34 +123,13 @@ class McpClient
             ->acceptJson()
             ->withHeaders(['Content-Type' => 'application/json']);
 
-        if (($email = $this->actingUserEmail()) !== null) {
-            $req = $req->withHeaders([self::ACTING_USER_HEADER => $email]);
-
-            if (is_string($this->actingSignatureSecret) && $this->actingSignatureSecret !== '') {
-                $req = $req->withHeaders([
-                    self::ACTING_SIG_HEADER => 'sha256='.hash_hmac('sha256', $email, $this->actingSignatureSecret),
-                ]);
-            }
+        // Pro Request frisch ausgewertet: der eingeloggte User kann zwischen
+        // zwei Calls wechseln, und ein asService()-Block gilt nur für seine Dauer.
+        if (is_callable($this->actingHeaders) && ($headers = ($this->actingHeaders)()) !== []) {
+            $req = $req->withHeaders($headers);
         }
 
         return $this->sessionId ? $req->withHeaders(['Mcp-Session-Id' => $this->sessionId]) : $req;
-    }
-
-    /**
-     * Aktuelle Acting-User-E-Mail über den Resolver — pro Request frisch
-     * ausgewertet (eingeloggter User kann zwischen Calls wechseln). Liefert
-     * null bei fehlendem Resolver, Hintergrund-Jobs oder leerem Ergebnis.
-     */
-    protected function actingUserEmail(): ?string
-    {
-        if (! is_callable($this->actingUserResolver)) {
-            return null;
-        }
-
-        $email = ($this->actingUserResolver)();
-        $email = is_string($email) ? trim($email) : '';
-
-        return $email !== '' ? $email : null;
     }
 
     /**

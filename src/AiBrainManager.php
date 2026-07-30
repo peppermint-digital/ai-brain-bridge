@@ -41,6 +41,17 @@ class AiBrainManager
     protected $inboundUserResolver;
 
     /**
+     * Ausdrücklicher Systemaufruf (siehe {@see asService()}). Nur wenn das hier
+     * true ist, läuft ein Call OHNE handelnde Person.
+     *
+     * Bewusst ein eigenes Flag und nicht „Resolver ist null": ein fehlender
+     * Resolver bedeutet seit Version 1.2 den sicheren Default (der eingeloggte
+     * User), nicht mehr „niemand". Sonst wäre der userlose Modus wieder das,
+     * was er vorher war — der stille Normalfall, den man nicht sieht.
+     */
+    protected bool $serviceMode = false;
+
+    /**
      * @param  array<string, mixed>  $config
      */
     public function __construct(
@@ -50,6 +61,60 @@ class AiBrainManager
     ) {
         $resolver = $config['acting_user']['resolver'] ?? null;
         $this->actingUserResolver = is_callable($resolver) ? $resolver : null;
+    }
+
+    /**
+     * Die E-Mail der handelnden Person für den aktuellen Call — die EINZIGE
+     * Stelle, an der das entschieden wird.
+     *
+     * Reihenfolge:
+     *  1. Ausdrücklicher Systemaufruf ({@see asService()}) ⇒ null, keine Person.
+     *  2. Vom Produkt gesetzter Resolver ⇒ dessen Ergebnis.
+     *  3. Sicherer Default: der authentifizierte User dieses Requests.
+     *
+     * Punkt 3 ist der Unterschied zu früher: ohne Konfiguration lief bisher
+     * ALLES ohne handelnde Person, und niemandem fiel es auf. Ein frisch
+     * installiertes Produkt schickt jetzt von sich aus den eingeloggten User
+     * mit; wer wirklich ohne Person handeln will, muss das hinschreiben.
+     *
+     * In einem Hintergrund-Job gibt es keinen eingeloggten User — dort liefert
+     * der Default null. Solche Aufrufe gehören ausdrücklich in asService().
+     */
+    public function actingUserEmail(): ?string
+    {
+        if ($this->serviceMode) {
+            return null;
+        }
+
+        $email = is_callable($this->actingUserResolver)
+            ? ($this->actingUserResolver)()
+            : $this->authenticatedUserEmail();
+
+        $email = is_string($email) ? trim($email) : '';
+
+        return $email !== '' ? $email : null;
+    }
+
+    /**
+     * Sicherer Default: die E-Mail des authentifizierten Users, sofern dieser
+     * Request überhaupt einen hat. Bewusst defensiv — die Bridge läuft auch in
+     * Anwendungen ohne `auth`-Binding (Konsole, Tests, schlanke Services).
+     */
+    protected function authenticatedUserEmail(): ?string
+    {
+        if (! function_exists('auth')) {
+            return null;
+        }
+
+        try {
+            $user = auth()->user();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $email = is_object($user) && isset($user->email) ? $user->email : null;
+
+        return is_string($email) ? $email : null;
     }
 
     // ── MCP (Schiene 1) ──────────────────────────────────────────────────
@@ -143,20 +208,23 @@ class AiBrainManager
      */
     public function asService(callable $callback)
     {
-        $previous = $this->actingUserResolver;
-        $this->actingUserResolver = null;
+        $previous = $this->serviceMode;
+        $this->serviceMode = true;
 
         try {
             return $callback();
         } finally {
-            $this->actingUserResolver = $previous;
+            $this->serviceMode = $previous;
         }
     }
 
     /**
      * Globales Event-Secret zum Signieren der Acting-User-Assertion (Phase 4.2).
-     * Null/leer ⇒ keine Signatur (Brain erzwingt sie nur, wenn das Produkt es
-     * via require_acting_user_signature aktiviert hat).
+     *
+     * Null/leer ⇒ keine Signatur. AI Brain erzwingt sie, sobald dort ein
+     * Event-Secret konfiguriert ist — das ist Plattform-Standard und KEIN
+     * Produkt-Flag. Ohne Secret auf beiden Seiten trägt allein das
+     * OAuth-Token die Authentifizierung (fail-safe für frische Installationen).
      */
     protected function actingSignatureSecret(): ?string
     {
@@ -177,14 +245,7 @@ class AiBrainManager
      */
     public function actingUserHeaders(): array
     {
-        if (! is_callable($this->actingUserResolver)) {
-            return [];
-        }
-
-        $email = ($this->actingUserResolver)();
-        $email = is_string($email) ? trim($email) : '';
-
-        if ($email === '') {
+        if (($email = $this->actingUserEmail()) === null) {
             return [];
         }
 
@@ -213,7 +274,7 @@ class AiBrainManager
         $url = $this->config['mcp']['brain_url']
             ?: rtrim((string) $this->config['base_url'], '/').'/mcp/brain';
 
-        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), $this->actingUserResolver, $this->actingSignatureSecret());
+        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), fn (): array => $this->actingUserHeaders());
     }
 
     /**
@@ -221,7 +282,7 @@ class AiBrainManager
      */
     public function mcp(string $url): McpClient
     {
-        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), $this->actingUserResolver, $this->actingSignatureSecret());
+        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), fn (): array => $this->actingUserHeaders());
     }
 
     // ── Channels (Spezial-MCP) ───────────────────────────────────────────

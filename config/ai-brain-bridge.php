@@ -70,15 +70,22 @@ return [
     | MCP-Call den handelnden End-User; Brain handelt dann als dieser User statt
     | als Owner (korrekte Attribution + Sichtbarkeit/Rechte).
     |
-    | `resolver` ist ein Callback (?callable): liefert die E-Mail des aktuell
-    | eingeloggten Produkt-Users — oder null bei Hintergrund-/System-Jobs.
-    | null (Default) ⇒ kein Header ⇒ alles läuft als Owner (heutiges Verhalten).
+    | SICHERER DEFAULT (ab 1.2): ist hier NICHTS gesetzt, schickt die Bridge den
+    | aktuell authentifizierten User als handelnde Person mit. Ein frisch
+    | installiertes Produkt ist damit von sich aus korrekt zugeordnet.
     |
-    | WICHTIG: Das Produkt darf NUR den authentifizierten User behaupten
-    | (z.B. fn () => auth()->user()?->email), niemals ungeprüften Input. Greift
-    | nur, wenn das Produkt in Brain `allow_acting_user` aktiviert hat.
+    | Vorher bedeutete „kein Resolver" stillschweigend „niemand" — jeder Aufruf
+    | lief ohne Person, und das fiel nirgends auf. Wer wirklich ohne Person
+    | handeln will (Hintergrund-Jobs, Health-Checks, Infra), schreibt das hin:
     |
-    | Alternativ zur Config kann das Produkt den Resolver zur Laufzeit setzen:
+    |     AiBrain::asService(fn () => AiBrain::call('...'));
+    |
+    | `resolver` überschreibt den Default und ist nur nötig, wenn die handelnde
+    | E-Mail anders ermittelt wird als über `auth()`. Das Produkt darf dabei NUR
+    | den authentifizierten User behaupten, niemals ungeprüften Input — AI Brain
+    | prüft die Behauptung per HMAC-Signatur und weist unbekannte E-Mails ab.
+    |
+    | Alternativ zur Config zur Laufzeit setzbar:
     | AiBrain::resolveActingUserUsing(fn () => auth()->user()?->email);
     */
     'acting_user' => [
