@@ -147,3 +147,19 @@ it('liest den Resolver aus der Config', function () {
     Http::assertSent(fn ($request) => str_contains($request->url(), '/mcp/brain')
         && $request->hasHeader(McpClient::ACTING_USER_HEADER, 'configured@example.test'));
 });
+
+it('faellt ohne konfigurierten Slug auf das Altformat zurueck statt auf leeren Kontext', function () {
+    // Sonst ginge `|{email}` raus: weder gueltig-neu noch gueltig-alt. AI Brain
+    // antwortete 403 und die Anbindung waere still kaputt — genau die Sorte
+    // Fehler, die erst beim Kunden auffaellt.
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    config()->set('ai-brain-bridge.source', '');
+    app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
+    AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
+
+    $headers = AiBrain::actingUserHeaders();
+
+    expect($headers[McpClient::ACTING_SIG_HEADER])
+        ->toBe('sha256='.hash_hmac('sha256', 'martin@example.test', 'shared-secret'))
+        ->not->toContain(hash_hmac('sha256', '|martin@example.test', 'shared-secret'));
+});

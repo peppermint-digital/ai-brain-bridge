@@ -256,7 +256,16 @@ class AiBrainManager
      */
     public static function signActingUser(string $email, string $secret): string
     {
-        $context = (string) config('ai-brain-bridge.source', '');
+        $context = trim((string) config('ai-brain-bridge.source', ''));
+
+        // Ohne bekannten Slug gibt es keinen Kontext zu binden. Dann MUSS das
+        // Altformat raus, nicht etwa ein leerer Kontext: `|{email}` waere weder
+        // gueltig-neu noch gueltig-alt, und AI Brain antwortete 403 — die
+        // Anbindung waere still kaputt. Lieber die schwaechere, aber gueltige
+        // Signatur; AI Brain nimmt sie waehrend des Uebergangs an.
+        if ($context === '') {
+            return self::signPeerActingUser($email, $secret);
+        }
 
         return 'sha256='.hash_hmac('sha256', $context.'|'.$email, $secret);
     }
