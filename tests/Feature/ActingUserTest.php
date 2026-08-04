@@ -4,6 +4,18 @@ use Illuminate\Support\Facades\Http;
 use Peppermint\AiBrainBridge\Facades\AiBrain;
 use Peppermint\AiBrainBridge\Mcp\McpClient;
 
+/**
+ * Legt einen One-Click-Claim-Store mit dem gegebenen Slug an und liefert den Pfad.
+ * Der Store — nicht die Config — bestimmt den Signatur-Kontext.
+ */
+function bridgeStoreWithSlug(string $slug): string
+{
+    $path = sys_get_temp_dir().'/bridge-store-'.uniqid().'.json';
+    file_put_contents($path, json_encode(['source' => $slug]));
+
+    return $path;
+}
+
 beforeEach(function () {
     config()->set('ai-brain-bridge.base_url', 'https://brain.test');
     config()->set('ai-brain-bridge.oauth.client_id', 'cid');
@@ -66,7 +78,8 @@ it('hängt KEINEN Header an, wenn der Resolver null liefert (Hintergrund-Job)', 
 
 it('signiert die Acting-User-Assertion mit dem Event-Secret', function () {
     config()->set('ai-brain-bridge.events.secret', 'shared-secret');
-    config()->set('ai-brain-bridge.source', 'mein-produkt');
+    config()->set('ai-brain-bridge.store_path', bridgeStoreWithSlug('mein-produkt'));
+    app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
     AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
 
     AiBrain::call('create-task-tool', ['title' => 'X']);
@@ -105,7 +118,7 @@ it('actingUserHeaders() liefert den Acting-User-Header, wenn der Resolver greift
 
 it('actingUserHeaders() signiert mit dem Event-Secret', function () {
     config()->set('ai-brain-bridge.events.secret', 'shared-secret');
-    config()->set('ai-brain-bridge.source', 'mein-produkt');
+    config()->set('ai-brain-bridge.store_path', bridgeStoreWithSlug('mein-produkt'));
     app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
     AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
 
@@ -148,18 +161,34 @@ it('liest den Resolver aus der Config', function () {
         && $request->hasHeader(McpClient::ACTING_USER_HEADER, 'configured@example.test'));
 });
 
-it('faellt ohne konfigurierten Slug auf das Altformat zurueck statt auf leeren Kontext', function () {
-    // Sonst ginge `|{email}` raus: weder gueltig-neu noch gueltig-alt. AI Brain
-    // antwortete 403 und die Anbindung waere still kaputt — genau die Sorte
-    // Fehler, die erst beim Kunden auffaellt.
+it('signiert das Altformat, wenn kein Claim-Store da ist (nicht angebunden)', function () {
+    // Ohne One-Click-Store kennt AI Brain uns unter keinem Slug. Ein geratener
+    // Kontext (die Config faellt auf APP_NAME zurueck!) erzeugte eine Signatur,
+    // die AI Brain mit 403 abweist — die Anbindung waere still kaputt.
     config()->set('ai-brain-bridge.events.secret', 'shared-secret');
-    config()->set('ai-brain-bridge.source', '');
+    config()->set('ai-brain-bridge.source', 'Peppermint Manager');   // APP_NAME-Fallback
+    config()->set('ai-brain-bridge.store_path', '/nicht/vorhanden.json');
     app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
     AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
 
-    $headers = AiBrain::actingUserHeaders();
+    expect(AiBrain::actingUserHeaders()[McpClient::ACTING_SIG_HEADER])
+        ->toBe('sha256='.hash_hmac('sha256', 'martin@example.test', 'shared-secret'));
+});
 
-    expect($headers[McpClient::ACTING_SIG_HEADER])
-        ->toBe('sha256='.hash_hmac('sha256', 'martin@example.test', 'shared-secret'))
-        ->not->toContain(hash_hmac('sha256', '|martin@example.test', 'shared-secret'));
+it('signiert mit dem Slug aus dem Claim-Store, nicht mit dem Config-Wert', function () {
+    // Der Store ist die Wahrheit: dort steht der Slug, unter dem AI Brain uns
+    // kennt. Die Config kann daneben etwas ganz anderes stehen haben.
+    $store = sys_get_temp_dir().'/bridge-store-'.uniqid().'.json';
+    file_put_contents($store, json_encode(['source' => 'peppermint-manager']));
+
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    config()->set('ai-brain-bridge.source', 'Peppermint Manager');   // absichtlich falsch
+    config()->set('ai-brain-bridge.store_path', $store);
+    app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
+    AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
+
+    expect(AiBrain::actingUserHeaders()[McpClient::ACTING_SIG_HEADER])
+        ->toBe('sha256='.hash_hmac('sha256', 'peppermint-manager|martin@example.test', 'shared-secret'));
+
+    @unlink($store);
 });

@@ -5,6 +5,7 @@ namespace Peppermint\AiBrainBridge;
 use Illuminate\Support\Facades\Event;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
 use Peppermint\AiBrainBridge\Channels\ChannelClient;
+use Peppermint\AiBrainBridge\Config\BridgeConfig;
 use Peppermint\AiBrainBridge\Events\AiBrainEventReceived;
 use Peppermint\AiBrainBridge\Events\Event as BridgeEvent;
 use Peppermint\AiBrainBridge\Events\EventPublisher;
@@ -256,18 +257,26 @@ class AiBrainManager
      */
     public static function signActingUser(string $email, string $secret): string
     {
-        $context = trim((string) config('ai-brain-bridge.source', ''));
+        // Der Kontext MUSS der Slug sein, unter dem AI Brain uns kennt — sonst
+        // schlaegt die Pruefung dort fehl (403). Massgeblich ist deshalb allein
+        // der Claim-Store: dort steht `source` = `product_slug` aus dem
+        // One-Click-Bundle.
+        //
+        // Ausdruecklich NICHT `config('ai-brain-bridge.source')`: diese Kette
+        // faellt auf `APP_NAME` zurueck ("Peppermint Manager" statt
+        // "peppermint-manager"). Der Wert ist also nie leer, sieht aber richtig
+        // aus — und wuerde eine Signatur erzeugen, die AI Brain nicht kennt.
+        $slug = BridgeConfig::load()['source'] ?? null;
+        $slug = is_string($slug) ? trim($slug) : '';
 
-        // Ohne bekannten Slug gibt es keinen Kontext zu binden. Dann MUSS das
-        // Altformat raus, nicht etwa ein leerer Kontext: `|{email}` waere weder
-        // gueltig-neu noch gueltig-alt, und AI Brain antwortete 403 — die
-        // Anbindung waere still kaputt. Lieber die schwaechere, aber gueltige
-        // Signatur; AI Brain nimmt sie waehrend des Uebergangs an.
-        if ($context === '') {
+        // Nicht ueber One-Click angebunden → kein belegbarer Slug → Altformat.
+        // Schwaecher, aber gueltig; AI Brain nimmt es waehrend des Uebergangs an
+        // und die Log-Warnung weist das Produkt als noch offen aus.
+        if ($slug === '') {
             return self::signPeerActingUser($email, $secret);
         }
 
-        return 'sha256='.hash_hmac('sha256', $context.'|'.$email, $secret);
+        return 'sha256='.hash_hmac('sha256', $slug.'|'.$email, $secret);
     }
 
     /**
