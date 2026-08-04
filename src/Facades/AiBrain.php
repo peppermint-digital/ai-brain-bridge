@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \Peppermint\AiBrainBridge\AiBrainManager resolveActingUserUsing(?callable $resolver)
  * @method static mixed asService(callable $callback)
  * @method static array actingUserHeaders()
+ * @method static array peerActingUserHeaders()
  * @method static \Peppermint\AiBrainBridge\AiBrainManager resolveInboundUserUsing(?callable $resolver)
  * @method static mixed resolveInboundUser(string $email)
  * @method static ?string actingSecret()

@@ -42,13 +42,17 @@ class PeerClient
             // Der Peer-Token sagt, WELCHES Produkt anruft — nicht, wer dort
             // gehandelt hat. Seit die Systemverbindung bewusst ohne Person
             // läuft, entstünden beim Peer sonst Datensätze ohne Urheber.
-            // Dieselben Header wie zum Brain (McpClient), dieselbe HMAC über
-            // das geteilte Event-Secret; unter AiBrain::asService() bleiben sie
-            // leer, damit Hintergrund-Aufrufe identitätslos bleiben.
+            // Dieselben Header wie zum Brain (McpClient), über dasselbe geteilte
+            // Event-Secret; unter AiBrain::asService() bleiben sie leer, damit
+            // Hintergrund-Aufrufe identitätslos bleiben.
+            //
+            // Die HMAC ist hier bewusst die Peer-Variante (nur E-Mail): die
+            // Gegenseite ist ein Produkt mit womöglich älterem Paket. Siehe
+            // {@see AiBrainManager::signPeerActingUser()}.
             $req = Http::acceptJson()
                 ->timeout($this->timeoutSeconds)
                 ->withToken((string) $connector->api_token)
-                ->withHeaders(AiBrain::actingUserHeaders());
+                ->withHeaders(AiBrain::peerActingUserHeaders());
 
             $res = match (strtoupper($method)) {
                 'GET' => $req->get($url, $data),

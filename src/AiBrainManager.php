@@ -243,6 +243,63 @@ class AiBrainManager
      *
      * @return array<string, string>
      */
+    /**
+     * Signiert die Acting-User-Behauptung gegenüber AI Brain.
+     *
+     * Der HMAC deckt **Produkt-Slug und E-Mail** ab (AI Brain, Bug #520). Vorher
+     * war es die E-Mail allein — damit war jede Assertion ein universeller
+     * Ausweis, der auch in fremden Kontexten galt: ein angebundenes Produkt
+     * konnte damit die Git-Deploy-Keys beliebiger Channels abholen.
+     *
+     * Der Slug ist derselbe, unter dem AI Brain uns kennt (`source`, aus dem
+     * One-Click-Claim). Stimmt er nicht, lehnt AI Brain die Signatur ab.
+     */
+    public static function signActingUser(string $email, string $secret): string
+    {
+        $context = (string) config('ai-brain-bridge.source', '');
+
+        return 'sha256='.hash_hmac('sha256', $context.'|'.$email, $secret);
+    }
+
+    /**
+     * Signatur für Aufrufe an ein anderes PRODUKT (Peer), nicht an AI Brain.
+     *
+     * Bewusst weiterhin das Altformat (nur E-Mail): Die Gegenseite prüft mit
+     * {@see \Peppermint\AiBrainBridge\Http\Middleware\ResolvePeerActingUser},
+     * und die Produkte aktualisieren dieses Paket nicht gleichzeitig. Würde hier
+     * kontextgebunden signiert, verwürfe jeder Peer mit älterem Paket den Header
+     * — die Aufrufe liefen weiter (Peer-Delegation ist Zuschreibung, keine
+     * Autorisierung), aber die Datensätze verlören ihren Urheber.
+     *
+     * Das ist vertretbar, weil die Lücke aus Bug #520 an AI Brains Push-Gate
+     * hing, nicht an der Peer-Zuschreibung. Umstellung, sobald alle Produkte das
+     * neue Paket haben — dieselbe Welle wie Task #3736.
+     */
+    public static function signPeerActingUser(string $email, string $secret): string
+    {
+        return 'sha256='.hash_hmac('sha256', $email, $secret);
+    }
+
+    /**
+     * Acting-User-Header für Peer-Aufrufe (Produkt → Produkt).
+     *
+     * @return array<string, string>
+     */
+    public function peerActingUserHeaders(): array
+    {
+        if (($email = $this->actingUserEmail()) === null) {
+            return [];
+        }
+
+        $headers = [McpClient::ACTING_USER_HEADER => $email];
+
+        if (($secret = $this->actingSignatureSecret()) !== null) {
+            $headers[McpClient::ACTING_SIG_HEADER] = self::signPeerActingUser($email, $secret);
+        }
+
+        return $headers;
+    }
+
     public function actingUserHeaders(): array
     {
         if (($email = $this->actingUserEmail()) === null) {
@@ -252,7 +309,7 @@ class AiBrainManager
         $headers = [McpClient::ACTING_USER_HEADER => $email];
 
         if (($secret = $this->actingSignatureSecret()) !== null) {
-            $headers[McpClient::ACTING_SIG_HEADER] = 'sha256='.hash_hmac('sha256', $email, $secret);
+            $headers[McpClient::ACTING_SIG_HEADER] = self::signActingUser($email, $secret);
         }
 
         return $headers;

@@ -66,11 +66,15 @@ it('hängt KEINEN Header an, wenn der Resolver null liefert (Hintergrund-Job)', 
 
 it('signiert die Acting-User-Assertion mit dem Event-Secret', function () {
     config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    config()->set('ai-brain-bridge.source', 'mein-produkt');
     AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
 
     AiBrain::call('create-task-tool', ['title' => 'X']);
 
-    $expected = 'sha256='.hash_hmac('sha256', 'martin@example.test', 'shared-secret');
+    // Bug #520: Der HMAC deckt Produkt-Slug UND E-Mail ab. Vorher war die
+    // Signatur ein universeller Ausweis, mit dem ein Produkt in fremden
+    // Kontexten (u.a. an AI Brains Push-Gate) handeln konnte.
+    $expected = 'sha256='.hash_hmac('sha256', 'mein-produkt|martin@example.test', 'shared-secret');
 
     Http::assertSent(fn ($request) => str_contains($request->url(), '/mcp/brain')
         && str_contains($request->body(), 'create-task-tool')
@@ -101,10 +105,26 @@ it('actingUserHeaders() liefert den Acting-User-Header, wenn der Resolver greift
 
 it('actingUserHeaders() signiert mit dem Event-Secret', function () {
     config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    config()->set('ai-brain-bridge.source', 'mein-produkt');
     app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
     AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
 
     expect(AiBrain::actingUserHeaders())->toBe([
+        McpClient::ACTING_USER_HEADER => 'martin@example.test',
+        McpClient::ACTING_SIG_HEADER => 'sha256='.hash_hmac('sha256', 'mein-produkt|martin@example.test', 'shared-secret'),
+    ]);
+});
+
+it('peerActingUserHeaders() bleibt beim Altformat (Peer-Zuschreibung)', function () {
+    // Produkt→Produkt prueft weiter E-Mail-only. Wuerde hier kontextgebunden
+    // signiert, verwuerfe jeder Peer mit aelterem Paket den Header und die
+    // Datensaetze verloeren ihren Urheber.
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    config()->set('ai-brain-bridge.source', 'mein-produkt');
+    app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
+    AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
+
+    expect(AiBrain::peerActingUserHeaders())->toBe([
         McpClient::ACTING_USER_HEADER => 'martin@example.test',
         McpClient::ACTING_SIG_HEADER => 'sha256='.hash_hmac('sha256', 'martin@example.test', 'shared-secret'),
     ]);
