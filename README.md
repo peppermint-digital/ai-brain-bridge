@@ -14,7 +14,10 @@ Kommunikationslayer (v1)"** in AI Brain.
 | **MCP** | synchrone Daten & Aktionen (beide Richtungen) | MCP-Tool-Calls über OAuth |
 | **Events** | asynchrone Benachrichtigungen (beide Richtungen) | signierter Event-Bus |
 
-Produkte reden **nur** mit AI Brain, nie direkt miteinander.
+AI Brain ist der Hub für beide Schienen. Daneben können Produkte über eine
+**Peer-Verbindung** auch direkt miteinander sprechen (`PeerClient` +
+`peer.acting-user`) — das läuft nicht über AI Brain und ist eine Abmachung
+zwischen den beteiligten Produkten.
 
 ## Identitäts-Modi — Service vs. User
 
