@@ -75,6 +75,11 @@ beforeEach(function () {
         'peer_slug' => 'peppermint-crm',
         'api_url' => 'https://crm.test',
         'api_token' => 'peer-token',
+        // Signiert wird seit #540 mit dem Geheimnis DIESER Verbindung; hier
+        // dasselbe wie das Event-Secret, damit die Erwartungen unten die
+        // Delegation prüfen und nicht die Schlüsselwahl (dafür gibt es
+        // PeerActingSecretTest).
+        'acting_secret' => 'shared-secret',
         'is_active' => true,
     ]);
 });

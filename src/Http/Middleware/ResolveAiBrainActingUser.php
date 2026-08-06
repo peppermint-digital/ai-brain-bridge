@@ -96,7 +96,7 @@ class ResolveAiBrainActingUser
      */
     protected function signatureValid(Request $request, string $assertedEmail): bool
     {
-        $secret = AiBrain::actingSecret();
+        $secret = $this->signingSecret($request);
 
         if ($secret === null || $secret === '') {
             return true;
@@ -114,5 +114,15 @@ class ResolveAiBrainActingUser
         }
 
         return true;
+    }
+
+    /**
+     * Mit welchem Geheimnis wird die Behauptung geprüft? Für AI-Brain-Aufrufe ist
+     * das die Anbindung selbst; die Peer-Variante überschreibt das mit dem
+     * Geheimnis der jeweiligen Verbindung ({@see ResolvePeerActingUser}).
+     */
+    protected function signingSecret(Request $request): ?string
+    {
+        return AiBrain::actingSecret();
     }
 }

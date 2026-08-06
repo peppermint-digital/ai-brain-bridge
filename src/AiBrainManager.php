@@ -303,7 +303,7 @@ class AiBrainManager
      *
      * @return array<string, string>
      */
-    public function peerActingUserHeaders(): array
+    public function peerActingUserHeaders(?string $connectionSecret = null): array
     {
         if (($email = $this->actingUserEmail()) === null) {
             return [];
@@ -311,7 +311,15 @@ class AiBrainManager
 
         $headers = [McpClient::ACTING_USER_HEADER => $email];
 
-        if (($secret = $this->actingSignatureSecret()) !== null) {
+        // Vorrang hat das Geheimnis der Peer-VERBINDUNG (#540). Das Event-Secret
+        // der Brain-Anbindung bleibt nur der Rückfallweg für Verbindungen, die
+        // noch keines haben — seit AI Brain es pro Produkt vergibt, teilen zwei
+        // Peers dort ohnehin nichts mehr.
+        $secret = ($connectionSecret !== null && $connectionSecret !== '')
+            ? $connectionSecret
+            : $this->actingSignatureSecret();
+
+        if ($secret !== null) {
             $headers[McpClient::ACTING_SIG_HEADER] = self::signPeerActingUser($email, $secret);
         }
 

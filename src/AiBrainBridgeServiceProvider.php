@@ -100,6 +100,16 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
                 [\Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController::class, 'claim'],
             )
             ->name('peer.connect.claim');
+
+        // Übergabe des Signatur-Geheimnisses für Verbindungen, die vor #540
+        // entstanden sind. Hinter `peer.auth` — der Peer-Token dieser Verbindung
+        // ist der Ausweis; ohne ihn kommt hier niemand an.
+        Route::middleware(['api', 'peer.auth', 'throttle:20,1'])
+            ->post(
+                '/api/v1/peer/acting-secret',
+                [\Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController::class, 'actingSecret'],
+            )
+            ->name('peer.acting-secret');
     }
 
     /**

@@ -33,4 +33,34 @@ class PeerConnectController
 
         return response()->json($bundle);
     }
+
+    /**
+     * Der verbundene Peer hinterlegt das Geheimnis, mit dem er seine
+     * Acting-User-Behauptungen ab jetzt signiert (#540).
+     *
+     * Hinter `peer.auth`: Nur wer den gültigen Token dieser Verbindung besitzt,
+     * kommt hier an — dieselbe Vertrauensgrenze, die auch alle anderen
+     * Peer-Aufrufe traegt. Gedacht fuer Verbindungen, die vor #540 entstanden
+     * sind und noch kein eigenes Geheimnis haben; neue bekommen es im Bundle.
+     */
+    public function actingSecret(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'acting_secret' => ['required', 'string', 'min:32', 'max:255'],
+        ]);
+
+        $stored = $this->peers->storeInboundActingSecret($request->bearerToken(), $data['acting_secret']);
+
+        if (! $stored) {
+            return response()->json(['message' => 'Keine passende eingehende Verbindung.'], 422);
+        }
+
+        // Die Quittung ist bewusst ein eigenes Merkmal und nicht bloss HTTP 200:
+        // Der Anrufer darf sein Geheimnis nur dann als vereinbart ablegen, wenn
+        // WIRKLICH diese Stelle geantwortet hat. Ein freundlicher Catch-All oder
+        // ein Proxy, der auf alles mit 200 antwortet, wuerde sonst eine
+        // Vereinbarung vortaeuschen, die nie zustande kam — und ab da schluege
+        // jede Signatur fehl.
+        return response()->json(['status' => 'ok', 'peer_acting_secret' => 'stored']);
+    }
 }

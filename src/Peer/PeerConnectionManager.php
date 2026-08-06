@@ -3,6 +3,7 @@
 namespace Peppermint\AiBrainBridge\Peer;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -47,6 +48,10 @@ class PeerConnectionManager
                 'peer_slug' => (string) config('ai-brain-bridge.source'),
                 'api_url' => $this->selfApiUrl(),
                 'api_token' => $token->plain,
+                // Signatur-Geheimnis dieser Verbindung (#540). Gehört der Richtung
+                // „Peer ruft mich", nicht der Brain-Anbindung — deshalb hier und
+                // nicht aus dem Event-Secret geliehen.
+                'acting_secret' => self::newActingSecret(),
                 'openapi_url' => config('ai-brain-bridge.peer.openapi_url'),
                 'scopes' => array_values($scopes),
             ],
@@ -86,6 +91,7 @@ class PeerConnectionManager
             'direction' => 'inbound',
             'peer_slug' => $fromSlug,
             'token_hash' => hash('sha256', (string) $bundle['api_token']),
+            'acting_secret' => $bundle['acting_secret'] ?? null,
             'scopes' => $bundle['scopes'] ?? null,
             'issued_token_ref' => $claim->issuer_ref,
             'status' => 'active',
@@ -126,6 +132,9 @@ class PeerConnectionManager
             'peer_slug' => $b['peer_slug'] ?? null,
             'api_url' => $b['api_url'] ?? $base,
             'api_token' => $b['api_token'] ?? null,
+            // Gegenstück zum inbound-Connector des Peers: dieselbe Zufallszahl,
+            // mit der ich meine Acting-User-Behauptungen an ihn signiere (#540).
+            'acting_secret' => $b['acting_secret'] ?? null,
             'openapi_url' => $b['openapi_url'] ?? null,
             // Informativ: was DARF ich beim Peer (vom Peer erteilte Scopes).
             'scopes' => $b['scopes'] ?? null,
@@ -238,6 +247,93 @@ class PeerConnectionManager
             'replaced_by_id' => $c->replaced_by_id,
             'created_at' => $c->created_at?->toIso8601String(),
         ])->all();
+    }
+
+    /**
+     * Ein frisches Signatur-Geheimnis für eine Peer-Richtung.
+     */
+    public static function newActingSecret(): string
+    {
+        return Str::random(64);
+    }
+
+    /**
+     * Das Geheimnis, mit dem ich meine Acting-User-Behauptungen an DIESEN Peer
+     * signiere — und wenn es noch keines gibt, eines besorgen.
+     *
+     * Verbindungen aus der Zeit vor #540 tragen keines. Sie alle von Hand neu zu
+     * verbinden wäre ein Flottenlauf; stattdessen legt der Anrufer beim ersten
+     * signierten Aufruf ein Geheimnis an und übergibt es dem Peer über den
+     * bereits token-authentifizierten Kanal. Danach ist Ruhe.
+     *
+     * Nimmt der Peer die Übergabe nicht an (altes Paket ⇒ 404), bleibt es beim
+     * bisherigen Verhalten: null zurück, der Aufrufer signiert wie zuvor. So wird
+     * unterwegs nichts schlechter, egal in welcher Reihenfolge ausgerollt wird.
+     */
+    public function actingSecretFor(PeerConnector $outbound): ?string
+    {
+        if ($outbound->hasActingSecret()) {
+            return $outbound->acting_secret;
+        }
+
+        if ($outbound->direction !== 'outbound' || empty($outbound->api_url) || empty($outbound->api_token)) {
+            return null;
+        }
+
+        $secret = self::newActingSecret();
+        $url = rtrim((string) $outbound->api_url, '/').'/api/v1/peer/acting-secret';
+
+        try {
+            $res = Http::acceptJson()
+                ->timeout(10)
+                ->withToken((string) $outbound->api_token)
+                ->post($url, ['acting_secret' => $secret]);
+        } catch (\Throwable $e) {
+            Log::warning('Peer-Signaturgeheimnis konnte nicht übergeben werden', [
+                'peer' => $outbound->peer_slug,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        // Nicht auf HTTP 200 allein verlassen: Nur die Quittung des Endpunkts
+        // beweist, dass der Peer das Geheimnis wirklich abgelegt hat. Sonst
+        // koennte ein Catch-All eine Vereinbarung vortaeuschen, und ab da waere
+        // jede Signatur ungueltig — mit demselben stillen 403 wie in #540.
+        if (! $res->successful() || $res->json('peer_acting_secret') !== 'stored') {
+            Log::info('Peer nimmt kein Signaturgeheimnis entgegen — Altverhalten bleibt', [
+                'peer' => $outbound->peer_slug,
+                'status' => $res->status(),
+            ]);
+
+            return null;
+        }
+
+        $outbound->forceFill(['acting_secret' => $secret])->save();
+
+        return $secret;
+    }
+
+    /**
+     * Endpoint-Seite der Übergabe: Der Peer, der mich mit diesem Token ruft,
+     * hinterlegt das Geheimnis, mit dem er ab jetzt signiert.
+     *
+     * Bewusst überschreibend: Nur wer den gültigen Token dieser Verbindung hat,
+     * kommt hier an — und das ist genau die Gegenstelle. So bleibt Rotation
+     * möglich, ohne die Verbindung neu aufzubauen.
+     */
+    public function storeInboundActingSecret(?string $token, string $secret): bool
+    {
+        $connector = $this->findInboundConnector($token);
+
+        if ($connector === null) {
+            return false;
+        }
+
+        $connector->forceFill(['acting_secret' => $secret])->save();
+
+        return true;
     }
 
     /**

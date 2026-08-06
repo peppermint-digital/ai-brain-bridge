@@ -50,6 +50,27 @@ class ResolvePeerActingUser extends ResolveAiBrainActingUser
     }
 
     /**
+     * Geprüft wird mit dem Geheimnis DIESER Verbindung (#540) — auffindbar über
+     * den Token, mit dem der Peer gerade anruft.
+     *
+     * Der Rückfall auf das Brain-Event-Secret bleibt für Verbindungen, die noch
+     * keines hinterlegt haben (altes Paket auf der Gegenseite). Er trägt nur
+     * noch, solange beide Produkte dasselbe Event-Secret haben — seit AI Brain
+     * es pro Produkt vergibt, ist das der Ausnahmefall, nicht die Regel.
+     */
+    protected function signingSecret(Request $request): ?string
+    {
+        $connector = app(\Peppermint\AiBrainBridge\Peer\PeerConnectionManager::class)
+            ->findInboundConnector($request->bearerToken());
+
+        if ($connector !== null && $connector->hasActingSecret()) {
+            return $connector->acting_secret;
+        }
+
+        return parent::signingSecret($request);
+    }
+
+    /**
      * Die Herkunftsnotiz (Channel) ist reine Zuschreibung und deshalb auch für
      * personengebundene Aufrufe sinnvoll.
      */
