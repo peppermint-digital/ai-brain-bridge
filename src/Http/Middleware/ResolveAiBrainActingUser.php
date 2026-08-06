@@ -106,8 +106,16 @@ class ResolveAiBrainActingUser
         $expected = 'sha256='.hash_hmac('sha256', $assertedEmail, $secret);
 
         if (! is_string($provided) || ! hash_equals($expected, $provided)) {
-            Log::warning('AI-Brain-Acting-User: ungültige Signatur, Header ignoriert', [
+            // „Keine Signatur mitgeschickt" und „Signatur passt nicht" sind zwei
+            // verschiedene Fehler mit zwei verschiedenen Ursachen — sie in
+            // dieselbe Zeile zu schreiben hat bei #540 eine Stunde gekostet.
+            // Vom HMAC nur der Anfang: genug zum Vergleichen zweier Logs, zu
+            // wenig zum Rueckrechnen.
+            Log::warning('AI-Brain-Acting-User: Signatur verworfen, Header ignoriert', [
                 'email' => $assertedEmail,
+                'grund' => is_string($provided) ? 'Signatur passt nicht' : 'keine Signatur mitgeschickt',
+                'erwartet' => substr($expected, 0, 18),
+                'erhalten' => is_string($provided) ? substr($provided, 0, 18) : null,
             ]);
 
             return false;

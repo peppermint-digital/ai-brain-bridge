@@ -317,17 +317,24 @@ class PeerConnectionManager
 
     /**
      * Endpoint-Seite der Übergabe: Der Peer, der mich mit diesem Token ruft,
-     * hinterlegt das Geheimnis, mit dem er ab jetzt signiert.
+     * hinterlegt EINMALIG das Geheimnis, mit dem er ab jetzt signiert.
      *
-     * Bewusst überschreibend: Nur wer den gültigen Token dieser Verbindung hat,
-     * kommt hier an — und das ist genau die Gegenstelle. So bleibt Rotation
-     * möglich, ohne die Verbindung neu aufzubauen.
+     * Bewusst NICHT überschreibend. Sonst waere das Geheimnis wertlos: Wer einen
+     * Peer-Token erbeutet, koennte sich hier ein eigenes setzen und danach jede
+     * beliebige Person behaupten. So ist es ein zweiter Faktor — mit dem Token
+     * allein kommt man an die Schreibzugriffe nicht heran, weil die eine
+     * beglaubigte Person verlangen.
+     *
+     * Preis: Laufen die beiden Seiten auseinander (etwa nach dem Einspielen
+     * einer Sicherung), heilt sich das nicht mehr von selbst. Dann muss die
+     * Verbindung neu hergestellt werden — sichtbar, weil beide Seiten es
+     * protokollieren.
      */
     public function storeInboundActingSecret(?string $token, string $secret): bool
     {
         $connector = $this->findInboundConnector($token);
 
-        if ($connector === null) {
+        if ($connector === null || $connector->hasActingSecret()) {
             return false;
         }
 

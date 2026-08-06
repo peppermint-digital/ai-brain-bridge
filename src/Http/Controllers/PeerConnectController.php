@@ -52,7 +52,11 @@ class PeerConnectController
         $stored = $this->peers->storeInboundActingSecret($request->bearerToken(), $data['acting_secret']);
 
         if (! $stored) {
-            return response()->json(['message' => 'Keine passende eingehende Verbindung.'], 422);
+            // Entweder gibt es keine passende Verbindung — oder sie hat bereits
+            // ein Geheimnis. Beides ist eine Absage, und beide Faelle absichtlich
+            // ununterscheidbar: ein Angreifer mit erbeutetem Token soll hier
+            // nichts ueber den Zustand der Verbindung lernen.
+            return response()->json(['message' => 'Kein Geheimnis hinterlegt.'], 422);
         }
 
         // Die Quittung ist bewusst ein eigenes Merkmal und nicht bloss HTTP 200:

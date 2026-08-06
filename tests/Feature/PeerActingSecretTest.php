@@ -257,3 +257,31 @@ it('nimmt das Geheimnis nur mit gültigem Peer-Token entgegen', function () {
     expect(PeerConnector::query()->where('direction', 'inbound')->first()->acting_secret)
         ->toBe(str_repeat('a', 64));
 });
+
+it('lässt ein hinterlegtes Geheimnis nicht überschreiben', function () {
+    inboundConnector('ihr-token', 'bereits-vereinbart');
+
+    // Sonst waere das Geheimnis wertlos: Wer den Token erbeutet, setzte sich ein
+    // eigenes und behauptete danach jede beliebige Person.
+    $this->postJson('/api/v1/peer/acting-secret', ['acting_secret' => str_repeat('b', 64)], [
+        'Authorization' => 'Bearer ihr-token',
+    ])->assertStatus(422);
+
+    expect(PeerConnector::query()->where('direction', 'inbound')->first()->acting_secret)
+        ->toBe('bereits-vereinbart');
+});
+
+it('signiert weiter wie bisher, wenn der Peer die Übergabe ablehnt', function () {
+    $connector = outboundConnector();
+
+    Http::fake([
+        'manager.test/api/v1/peer/acting-secret' => Http::response(['message' => 'Kein Geheimnis hinterlegt.'], 422),
+        '*' => Http::response(['ok' => true]),
+    ]);
+
+    app(PeerClient::class)->call('peppermint-manager', 'POST', '/api/tasks');
+
+    // Nichts ablegen, was die Gegenseite nicht kennt — sonst schlüge ab jetzt
+    // jede Signatur fehl.
+    expect($connector->fresh()->acting_secret)->toBeNull();
+});
