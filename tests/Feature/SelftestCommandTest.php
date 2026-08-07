@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Http;
 
 /**
- * Fakt den kompletten Komm-Layer (OAuth + /mcp/brain + /api/v1/events) und
+ * Fakt den kompletten Komm-Layer (OAuth + /mcp/brain) und
  * echo't im Channel-Loop den gesendeten Sentinel zurück → Selftest grün.
  *
  * @param  bool  $mcpOk  list-projects-tool grün/rot simulieren

@@ -16,15 +16,14 @@ use Peppermint\AiBrainBridge\Facades\AiBrain;
  *
  *  - oauth   : client_credentials-Token (mcp:use) mintbar
  *  - mcp     : AiBrain::call('list-projects-tool') erreichbar (Schiene 1)
- *  - events  : AiBrain::emit('selftest.ping') signiert zugestellt (Schiene 1, async)
  *  - channel : voller Loop über den `selftest`-Channel — Sentinel → Agent-Echo →
  *              thread() bis done → verifiziert (Schiene Channel + R2)
  */
 class SelftestCommand extends Command
 {
-    protected $signature = 'ai-brain:selftest {--rail=all : oauth|mcp|events|channel|all} {--timeout=60 : Sekunden für den Channel-Loop}';
+    protected $signature = 'ai-brain:selftest {--rail=all : oauth|mcp|channel|all} {--timeout=60 : Sekunden für den Channel-Loop}';
 
-    protected $description = 'Funktionstest der AI-Brain-Anbindung (OAuth/MCP/Events/Channel) — grün/rot + Exit-Code';
+    protected $description = 'Funktionstest der AI-Brain-Anbindung (OAuth/MCP/Channel) — grün/rot + Exit-Code';
 
     public function handle(OAuthTokenProvider $tokens): int
     {
@@ -52,12 +51,6 @@ class SelftestCommand extends Command
             });
         }
 
-        if ($all || $rail === 'events') {
-            $results['events:emit'] = $this->check(
-                fn (): bool => AiBrain::emit('selftest.ping', ['ping' => true]) === true,
-            );
-        }
-
         if ($all || $rail === 'channel') {
             $results['channel:selftest'] = $this->check(
                 fn (): bool => $this->channelLoop(max(10, (int) $this->option('timeout'))),
@@ -65,7 +58,7 @@ class SelftestCommand extends Command
         }
 
         if ($results === []) {
-            $this->error("Unbekannte Schiene: {$rail}. Erlaubt: oauth|mcp|events|channel|all.");
+            $this->error("Unbekannte Schiene: {$rail}. Erlaubt: oauth|mcp|channel|all.");
 
             return self::INVALID;
         }
