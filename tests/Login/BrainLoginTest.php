@@ -125,3 +125,19 @@ it('lässt das Produkt die Zuordnung selbst bestimmen', function () {
 
     expect(auth()->user()->email)->toBe('anders@peppermint-digital.de');
 });
+
+it('nennt die Drossel beim Namen statt von Ablehnung zu sprechen', function () {
+    // 429 ist keine Ablehnung. Die falsche Meldung schickt Menschen auf die
+    // Suche nach einem Rechteproblem — und zum Nachlegen, das die Drossel
+    // frisch nachlädt.
+    Http::fake([
+        'brain.test/oauth/token' => Http::response(['message' => 'Too Many Attempts.'], 429),
+    ]);
+
+    $antwort = $this->withSession(['ai_brain_login.state' => 's', 'ai_brain_login.verifier' => 'v'])
+        ->get('/auth/brain/callback?code=abc&state=s');
+
+    $antwort->assertSessionHasErrors(['email' => 'Zu viele Anmeldeversuche in kurzer Zeit. Bitte eine Minute warten und erneut versuchen.']);
+
+    expect(auth()->check())->toBeFalse();
+});

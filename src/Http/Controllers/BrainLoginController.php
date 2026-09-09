@@ -108,7 +108,13 @@ class BrainLoginController
                 'status' => $antwort->status(),
             ]);
 
-            return $this->zurueckMitFehler('AI Brain hat die Anmeldung nicht bestätigt.');
+            // 429 ist keine Ablehnung, sondern eine Drossel. „Nicht bestätigt"
+            // schickt jemanden auf die Suche nach einem Rechteproblem, das es
+            // nicht gibt — und zum wiederholten Versuch, der die Drossel
+            // frisch nachlädt.
+            return $this->zurueckMitFehler($antwort->status() === 429
+                ? 'Zu viele Anmeldeversuche in kurzer Zeit. Bitte eine Minute warten und erneut versuchen.'
+                : 'AI Brain hat die Anmeldung nicht bestätigt.');
         }
 
         $person = Http::withToken((string) $antwort->json('access_token'))
