@@ -125,4 +125,48 @@ return [
         'middleware' => ['api'],
         'idempotency_ttl' => (int) env('AI_BRAIN_IDEMPOTENCY_TTL', 86400),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | App-Health melden (K7, AI Brain #5239)
+    |--------------------------------------------------------------------------
+    | Kam aus dem eigenstaendigen Paket `ai-brain/laravel-connector` und wohnt
+    | jetzt hier. Die ENV-Namen bleiben die alten (`AI_BRAIN_CONNECTOR_*`):
+    | Ein Produkt, das das alte Paket entfernt, muss dadurch nichts umtragen —
+    | ein Umbenennen haette hier nur Arbeit erzeugt und nichts verbessert.
+    |
+    | Solange das alte Paket noch installiert ist, meldet DIESER Weg nichts:
+    | Der ServiceProvider tritt zurueck, sonst liefe die Meldung doppelt.
+    |
+    | Transport (URL, OAuth-Token) ist derselbe wie fuer alles andere — kein
+    | eigenes Secret, keine eigene Adresse.
+    */
+    'health' => [
+        'enabled' => (bool) env('AI_BRAIN_CONNECTOR_ENABLED', true),
+
+        // Projekt-Slug in AI Brain. Leer lassen: AI Brain leitet es aus der
+        // Anbindung ab (der OAuth-Client ist auf ein Projekt gescopet).
+        'project' => env('AI_BRAIN_CONNECTOR_PROJECT', ''),
+
+        // Anzeigename der App. Leer lassen: dann gilt der Produkt-Slug der
+        // Anbindung, erst danach APP_NAME.
+        'app_name' => env('AI_BRAIN_CONNECTOR_APP'),
+
+        'schedule' => env('AI_BRAIN_CONNECTOR_SCHEDULE', 'everyFiveMinutes'),
+
+        // Aggregierte Fehler zwischen zwei Meldungen: Klasse, Ort, Haeufigkeit.
+        // Keine Stacktraces, keine Nutzlasten.
+        'exceptions' => [
+            'enabled' => (bool) env('AI_BRAIN_CONNECTOR_EXCEPTIONS', true),
+            'max_items' => (int) env('AI_BRAIN_CONNECTOR_EXCEPTIONS_MAX', 10),
+        ],
+
+        // Langsame Abfragen oberhalb der Schwelle, nach normalisiertem SQL
+        // zusammengefasst. Bindings werden nie uebertragen.
+        'slow_queries' => [
+            'enabled' => (bool) env('AI_BRAIN_CONNECTOR_SLOW_QUERIES', true),
+            'threshold_ms' => (int) env('AI_BRAIN_CONNECTOR_SLOW_QUERY_MS', 1000),
+            'max_items' => (int) env('AI_BRAIN_CONNECTOR_SLOW_QUERIES_MAX', 10),
+        ],
+    ],
 ];

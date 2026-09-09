@@ -110,6 +110,34 @@ Dieses Paket setzt auf `laravel/mcp` auf. Definiere deine Tools dort; AI Brain
 (bzw. der Agent) ruft sie über den Produkt-MCP-Endpoint auf. Eintrag in der
 AI-Brain-„ConnectedProduct"-Registry (URLs, OAuth-Client, Secret).
 
+## App-Health melden
+
+Seit K7 (AI Brain #5239) meldet dieses Paket auch den Gesundheitszustand der App
+an AI Brain — alle fünf Minuten, über denselben MCP-Weg wie alles andere. Kein
+eigenes Secret, keine eigene Adresse.
+
+```bash
+php artisan ai-brain:push-health --dry-run   # zeigt den Schnappschuss, sendet nicht
+```
+
+Erfasst werden Queue-Rückstand, fehlgeschlagene Jobs, Datenbank-Erreichbarkeit,
+aggregierte Fehler (Klasse, Ort, Häufigkeit — **keine** Stacktraces, **keine**
+Nutzlasten) und langsame Abfragen nach normalisiertem SQL (**ohne** Bindings).
+
+### Umstieg vom Paket `ai-brain/laravel-connector`
+
+Das Paket ist abgelöst; sein Inhalt wohnt jetzt hier. Der Umstieg ist ein
+Handgriff und braucht **keine** Änderung an der `.env` — die Variablennamen
+(`AI_BRAIN_CONNECTOR_*`) sind absichtlich dieselben geblieben:
+
+```bash
+composer remove ai-brain/laravel-connector
+```
+
+Solange das alte Paket installiert ist, **tritt dieses hier zurück** und meldet
+nichts. So kann jedes Produkt zu seinem eigenen Deploy umsteigen, ohne dass die
+Meldung zwischenzeitlich doppelt läuft.
+
 ## Status
 v0.1.
 

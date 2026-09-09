@@ -73,12 +73,64 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             $this->commands([
                 \Peppermint\AiBrainBridge\Console\SelftestCommand::class,
                 \Peppermint\AiBrainBridge\Console\ConnectCommand::class,
+                \Peppermint\AiBrainBridge\Console\PushHealthCommand::class,
             ]);
         }
 
         $this->registerInboundRoute();
         $this->registerConnectRoute();
         $this->registerPeerRoutes();
+        $this->registerHealthReporting();
+    }
+
+    /**
+     * App-Health melden (K7, AI Brain #5239).
+     *
+     * Kam aus dem eigenstaendigen Paket `ai-brain/laravel-connector`. Ein
+     * Produkt soll ein Paket installieren und einen Konfigurationsblock
+     * pflegen, nicht zwei mit derselben Gegenstelle.
+     *
+     * ## Der Ruecktritt
+     *
+     * Solange das alte Paket noch installiert ist, tut dieser Weg NICHTS. Sonst
+     * liefe die Meldung waehrend der Umstellung doppelt — und zwei Meldungen
+     * derselben App im Fuenf-Minuten-Takt sehen in AI Brain aus wie ein
+     * flatternder Dienst, nicht wie ein Umbau. Die Produkte koennen das alte
+     * Paket damit in Ruhe entfernen, jedes zu seinem eigenen Deploy.
+     */
+    protected function registerHealthReporting(): void
+    {
+        if (! \Peppermint\AiBrainBridge\Health\HealthReporting::aktiv()) {
+            return;
+        }
+
+        $this->app->singleton(\Peppermint\AiBrainBridge\Health\ExceptionRecorder::class);
+        $this->app->singleton(\Peppermint\AiBrainBridge\Health\SlowQueryRecorder::class);
+
+        // Bewusst auch in der Konsole: Queue-Worker sind der Ort, an dem die
+        // interessanten Fehler passieren.
+        if (config('ai-brain-bridge.health.exceptions.enabled', true)) {
+            \Illuminate\Support\Facades\Event::listen(
+                \Illuminate\Log\Events\MessageLogged::class,
+                fn ($event) => $this->app->make(\Peppermint\AiBrainBridge\Health\ExceptionRecorder::class)->record($event),
+            );
+        }
+
+        if (config('ai-brain-bridge.health.slow_queries.enabled', true)) {
+            \Illuminate\Support\Facades\Event::listen(
+                \Illuminate\Database\Events\QueryExecuted::class,
+                fn ($event) => $this->app->make(\Peppermint\AiBrainBridge\Health\SlowQueryRecorder::class)->record($event),
+            );
+        }
+
+        $this->app->booted(function (): void {
+            $schedule = $this->app->make(\Illuminate\Console\Scheduling\Schedule::class);
+            $event = $schedule->command('ai-brain:push-health')->withoutOverlapping();
+
+            $takt = (string) config('ai-brain-bridge.health.schedule', 'everyFiveMinutes');
+
+            method_exists($event, $takt) ? $event->{$takt}() : $event->everyFiveMinutes();
+        });
     }
 
     /**
