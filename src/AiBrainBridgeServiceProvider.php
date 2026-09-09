@@ -79,6 +79,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
 
         $this->registerInboundRoute();
         $this->registerConnectRoute();
+        $this->registerLoginRoutes();
         $this->registerPeerRoutes();
         $this->registerHealthReporting();
     }
@@ -181,6 +182,33 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         Route::middleware($middleware)->group(function () use ($route, $controller) {
             Route::get($route, [$controller, 'status'])->name('ai-brain-bridge.connect.status');
             Route::post($route, [$controller, 'connect'])->name('ai-brain-bridge.connect');
+        });
+    }
+
+    /**
+     * „Mit AI Brain anmelden" (AI Brain #5266) — nur wenn das Produkt es
+     * einschaltet. Ohne Freischaltung existieren die Routen nicht; der
+     * gewohnte Anmeldeweg ist davon in keinem Fall betroffen.
+     */
+    protected function registerLoginRoutes(): void
+    {
+        if (! config('ai-brain-bridge.login.enabled')) {
+            return;
+        }
+
+        $controller = \Peppermint\AiBrainBridge\Http\Controllers\BrainLoginController::class;
+        $middleware = (array) config('ai-brain-bridge.login.middleware', ['web']);
+
+        Route::middleware($middleware)->group(function () use ($controller): void {
+            Route::get(
+                (string) config('ai-brain-bridge.login.redirect_path', '/auth/brain/redirect'),
+                [$controller, 'redirect'],
+            )->name('ai-brain-bridge.login.redirect');
+
+            Route::get(
+                (string) config('ai-brain-bridge.login.callback_path', '/auth/brain/callback'),
+                [$controller, 'callback'],
+            )->name('ai-brain-bridge.login.callback');
         });
     }
 

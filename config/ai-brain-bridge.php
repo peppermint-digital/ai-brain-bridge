@@ -58,6 +58,32 @@ return [
     ],
 
     /*
+    | „Mit AI Brain anmelden" (AI Brain #5266) — authorization_code + PKCE,
+    | Scope `identity`. Standard AUS: Ein Produkt schaltet den Knopf frei, wenn
+    | sein Anmelde-Client in AI Brain angelegt ist (`comm-layer:login-client`).
+    |
+    | Der bestehende Anmeldeweg bleibt davon unberührt. Dies ist ein zweiter
+    | Knopf, kein Ersatz.
+    */
+    'login' => [
+        'enabled' => filter_var(env('AI_BRAIN_LOGIN', false), FILTER_VALIDATE_BOOL),
+        'client_id' => env('AI_BRAIN_LOGIN_CLIENT_ID'),
+        'client_secret' => env('AI_BRAIN_LOGIN_CLIENT_SECRET'),
+        'scope' => env('AI_BRAIN_LOGIN_SCOPE', 'identity'),
+        // Guard, in dem angemeldet wird — und dessen Nutzer-Modell die Person
+        // über die E-Mail gesucht wird.
+        'guard' => env('AI_BRAIN_LOGIN_GUARD', 'web'),
+        'redirect_path' => env('AI_BRAIN_LOGIN_START', '/auth/brain/redirect'),
+        'callback_path' => env('AI_BRAIN_LOGIN_CALLBACK', '/auth/brain/callback'),
+        'after_login' => env('AI_BRAIN_LOGIN_AFTER', '/dashboard'),
+        // Wohin bei einem Fehlschlag — die gewohnte Anmeldemaske des Produkts.
+        'failure_route' => env('AI_BRAIN_LOGIN_FAILURE_ROUTE', 'login'),
+        'middleware' => ['web'],
+        'timeout' => (int) env('AI_BRAIN_LOGIN_TIMEOUT', 15),
+        'button_label' => env('AI_BRAIN_LOGIN_LABEL', 'Mit AI Brain anmelden'),
+    ],
+
+    /*
     | MCP — synchrone Daten/Aktionen (Schiene 1).
     */
     'mcp' => [
