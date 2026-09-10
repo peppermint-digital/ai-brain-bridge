@@ -127,7 +127,11 @@ class SwitcherController
         }
 
         $basis = rtrim((string) config('ai-brain-bridge.base_url'), '/');
-        $methode = $request->isMethod('delete') ? 'delete' : 'post';
+        $methode = match (true) {
+            $request->isMethod('delete') => 'delete',
+            $request->isMethod('patch') => 'patch',
+            default => 'post',
+        };
 
         try {
             $antwort = Http::withToken(app(OAuthTokenProvider::class)->token())

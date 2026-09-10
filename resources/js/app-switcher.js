@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.5.0';
+    const VERSION = '1.6.0';
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -245,6 +245,8 @@
                         </span>
                         <span class="hinweis" role="tooltip">${this.sicher(pin.label)}</span>
                     </a>
+                    <button class="umbenennen" type="button" data-pin="${this.sicher(pin.id)}"
+                            aria-label="${this.sicher(pin.label)} umbenennen">&#9998;</button>
                     <button class="loesen" type="button" data-pin="${this.sicher(pin.id)}"
                             aria-label="${this.sicher(pin.label)} entfernen">&times;</button>
                 </span>`);
@@ -424,6 +426,13 @@
                 this.benennen();
             });
 
+            this.leiste.querySelectorAll('.umbenennen').forEach((knopf) => {
+                knopf.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.umbenennen(knopf.dataset.pin);
+                });
+            });
+
             this.leiste.querySelectorAll('.loesen').forEach((knopf) => {
                 knopf.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -449,10 +458,23 @@
 
             this.leiste.querySelector('.anpinnen')?.remove();
 
+            const feld = this.feldOeffnen(vorschlag, (name) => this.anpinnen(name));
+
+            feld.focus();
+            feld.select();
+        }
+
+        /**
+         * Das Namensfeld — eine Stelle fuer Anlegen und Umbenennen.
+         *
+         * Zwei Felder mit derselben Aufgabe waeren zwei Stellen, an denen das
+         * Abbrechen unterschiedlich funktioniert.
+         */
+        feldOeffnen(vorbelegung, beimBestaetigen) {
             const feld = document.createElement('input');
             feld.className = 'eingabe';
             feld.type = 'text';
-            feld.value = vorschlag;
+            feld.value = vorbelegung;
             feld.maxLength = 80;
             feld.setAttribute('aria-label', 'Name des Merkzettels');
             this.leiste.appendChild(feld);
@@ -465,7 +487,7 @@
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     this.bearbeitet = false;
-                    this.anpinnen(feld.value.trim() || vorschlag);
+                    beimBestaetigen(feld.value.trim() || vorbelegung);
                 }
 
                 if (e.key === 'Escape') {
@@ -475,11 +497,42 @@
             });
 
             feld.addEventListener('blur', () => {
-                // Ein Klick daneben ist ein Abbruch, kein Verlust: Was
-                // getippt wurde, war noch nicht abgelegt.
+                // Ein Klick daneben ist ein Abbruch, kein Verlust: Was getippt
+                // wurde, war noch nicht abgelegt.
                 if (this.bearbeitet) {
                     this.abbrechen();
                 }
+            });
+
+            return feld;
+        }
+
+        /**
+         * Einen vorhandenen Merkzettel umbenennen.
+         *
+         * Dieselbe Eingabe wie beim Anlegen, nur mit dem VORHANDENEN Namen
+         * vorbelegt — nicht mit dem Titel der Seite, auf der man gerade steht.
+         * Der hat mit dem Merkzettel nichts zu tun.
+         */
+        umbenennen(id) {
+            const pin = this.pins.find((p) => String(p.id) === String(id));
+
+            if (!pin) {
+                return;
+            }
+
+            const feld = this.feldOeffnen(pin.label, async (name) => {
+                const geaendert = await this.schicken('PATCH', { id: pin.id, label: name });
+
+                if (geaendert === null) {
+                    this.abbrechen();
+
+                    return;
+                }
+
+                this.pins = this.pins.map((p) => (String(p.id) === String(id) ? geaendert : p));
+                this.inSpeicher({ apps: this.apps, pins: this.pins });
+                this.zeichnen({ apps: this.apps, pins: this.pins });
             });
 
             feld.focus();
@@ -928,10 +981,31 @@
         transition: opacity 120ms ease;
     }
 
-    .pin-huelle:hover .loesen,
-    .loesen:focus-visible { opacity: 1; }
+    .umbenennen {
+        position: absolute;
+        top: -5px;
+        left: -5px;
+        width: 16px;
+        height: 16px;
+        padding: 0;
+        border: 1px solid var(--rand);
+        border-radius: 50%;
+        background: var(--grund);
+        color: var(--gedaempft);
+        font-size: 9px;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 120ms ease;
+    }
 
-    .loesen:hover { color: var(--schrift); }
+    .pin-huelle:hover .loesen,
+    .pin-huelle:hover .umbenennen,
+    .loesen:focus-visible,
+    .umbenennen:focus-visible { opacity: 1; }
+
+    .loesen:hover,
+    .umbenennen:hover { color: var(--schrift); }
 
     /* Anpinnen: gestrichelt, weil dort noch nichts ist. */
     .anpinnen {
@@ -1007,7 +1081,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .griff, .leiste, .kachel, .pin-kachel, .hinweis, .loesen, .anpinnen, .plus { transition: none; }
+        .griff, .leiste, .kachel, .pin-kachel, .hinweis, .loesen, .umbenennen, .anpinnen, .plus { transition: none; }
     }
 
     /* Ausdruecklich abgeschaltet (Avatar-Vollbild, Praesentation). */
