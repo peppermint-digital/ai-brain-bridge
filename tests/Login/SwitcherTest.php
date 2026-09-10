@@ -138,3 +138,23 @@ it('schreibt mit Anmeldung Skript und Element ins Layout', function () {
         ->and($markup)->toContain('/ai-brain/switcher/app-switcher.js')
         ->and($markup)->toContain('endpoint=');
 });
+
+it('gibt die Liste im Layout mit, statt sie nachladen zu lassen', function () {
+    // Sonst poppt die Leiste beim Ankommen nach — genau in dem Moment, in dem
+    // jemand gerade das System gewechselt hat und hinsieht.
+    Http::fake([
+        'brain.test/oauth/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
+        'brain.test/api/v1/users/me/apps*' => Http::response(['apps' => [
+            ['slug' => 'ai-brain', 'name' => 'AI Brain'],
+            ['slug' => 'peppermint-crm', 'name' => 'Peppermint CRM'],
+        ]]),
+        '*' => Http::response([], 500),
+    ]);
+
+    $this->actingAs($this->person);
+
+    $markup = app(SwitcherController::class)->markup();
+
+    expect($markup)->toContain('apps=')
+        ->and($markup)->toContain('peppermint-crm');
+});

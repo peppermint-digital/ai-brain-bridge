@@ -13,7 +13,7 @@
  *
  * EINBINDEN:
  *
- *     <script src="/switcher/app-switcher.js?v=8" defer></script>
+ *     <script src="/switcher/app-switcher.js?v=9" defer></script>
  *     <peppermint-app-switcher endpoint="/switcher/apps" aktuell="ai-brain">
  *     </peppermint-app-switcher>
  *
@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.0.0';
+    const VERSION = '1.1.0';
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -94,6 +94,18 @@
          * die sich im Monat vielleicht einmal aendert.
          */
         async laden() {
+            // Hat die Seite die Liste mitgeliefert, ist die Leiste sofort da —
+            // ohne Anfrage, ohne Nachpoppen beim Ankommen. Der Server kennt sie
+            // ohnehin; sie erst zu holen hiess, sie zweimal zu besorgen.
+            const mitgeliefert = this.ausAttribut();
+
+            if (mitgeliefert !== null) {
+                this.inSpeicher(mitgeliefert);
+                this.zeichnen(mitgeliefert);
+
+                return;
+            }
+
             const gemerkt = this.ausSpeicher();
 
             if (gemerkt) {
@@ -117,6 +129,23 @@
                 this.zeichnen(apps);
             } catch {
                 // Kein Netz, keine Leiste. Die Seite selbst geht das nichts an.
+            }
+        }
+
+        /** Die vom Server mitgelieferte Liste — oder null, wenn keine dasteht. */
+        ausAttribut() {
+            const roh = this.getAttribute('apps');
+
+            if (roh === null || roh === '') {
+                return null;
+            }
+
+            try {
+                const apps = JSON.parse(roh);
+
+                return Array.isArray(apps) ? apps : null;
+            } catch {
+                return null;
             }
         }
 
@@ -226,6 +255,41 @@
             this.offen = true;
             this.wrap.classList.add('offen');
             this.leiste.hidden = false;
+            this.vorwaermen();
+        }
+
+        /**
+         * Verbindung zu den Zielsystemen aufbauen, sobald die Leiste ausfaehrt.
+         *
+         * Zwischen Ausfahren und Klick liegen ein paar Hundert Millisekunden, in
+         * denen der Browser nichts tut. Namensaufloesung und Verschluesselung
+         * passen genau dorthin — beim Klick faellt dieser Teil dann weg.
+         *
+         * Nur einmal je Sitzung: Ein zweites preconnect auf dieselbe Adresse
+         * bringt nichts und muellt den Kopfbereich zu.
+         */
+        vorwaermen() {
+            if (this.vorgewaermt) {
+                return;
+            }
+
+            this.vorgewaermt = true;
+
+            for (const app of this.apps) {
+                if (app.aktuell === true || typeof app.url !== 'string') {
+                    continue;
+                }
+
+                try {
+                    const link = document.createElement('link');
+                    link.rel = 'preconnect';
+                    link.href = new URL(app.url).origin;
+                    link.crossOrigin = 'use-credentials';
+                    document.head.appendChild(link);
+                } catch {
+                    // Unbrauchbare Adresse — dann eben ohne Vorwaermen.
+                }
+            }
         }
 
         zumachen() {

@@ -161,13 +161,18 @@ class SwitcherController
         }
 
         $script = e(route('ai-brain-bridge.switcher.script'));
-        $apps = e(route('ai-brain-bridge.switcher.apps'));
+        $endpunkt = e(route('ai-brain-bridge.switcher.apps'));
         $slug = e((string) (BridgeConfig::load()['source']
             ?? config('ai-brain-bridge.source')));
 
+        // Die Liste MITGEBEN statt nachladen lassen: Sie steht ohnehin im
+        // Zwischenspeicher, und so ist die Leiste beim Ankommen sofort
+        // vollstaendig, statt nachzupoppen. `endpoint` bleibt als Rueckfall.
+        $liste = e((string) json_encode($this->apps(request())->getData(true)['apps'] ?? []));
+
         return <<<HTML
             <script src="{$script}" defer></script>
-            <peppermint-app-switcher endpoint="{$apps}" aktuell="{$slug}"></peppermint-app-switcher>
+            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}" apps="{$liste}"></peppermint-app-switcher>
             HTML;
     }
 
