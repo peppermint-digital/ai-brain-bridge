@@ -10,10 +10,12 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
+use Peppermint\AiBrainBridge\Auth\SitzungenBeenden;
 use Peppermint\AiBrainBridge\Config\BridgeConfig;
 use Peppermint\AiBrainBridge\Console\ConnectCommand;
 use Peppermint\AiBrainBridge\Console\PushHealthCommand;
 use Peppermint\AiBrainBridge\Console\SelftestCommand;
+use Peppermint\AiBrainBridge\Events\AiBrainEventReceived;
 use Peppermint\AiBrainBridge\Events\EventPublisher;
 use Peppermint\AiBrainBridge\Health\ExceptionRecorder;
 use Peppermint\AiBrainBridge\Health\HealthReporting;
@@ -98,6 +100,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             ]);
         }
 
+        $this->registerSitzungsEntzug();
         $this->registerInboundRoute();
         $this->registerConnectRoute();
         $this->registerLoginRoutes();
@@ -292,6 +295,21 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         Blade::directive(
             'aiBrainSwitcher',
             fn (): string => "<?php echo app('".SwitcherController::class."')->markup(); ?>",
+        );
+    }
+
+    /**
+     * Ein entzogener Zugang beendet die laufende Sitzung (AI Brain #5343).
+     *
+     * IMMER registriert, nicht hinter einem Schalter: Ein Sicherheitsriegel,
+     * den man einschalten muss, ist bei dem einen Produkt aus, bei dem es
+     * darauf ankommt. Kommt kein solches Ereignis, tut der Listener nichts.
+     */
+    protected function registerSitzungsEntzug(): void
+    {
+        Event::listen(
+            AiBrainEventReceived::class,
+            [SitzungenBeenden::class, 'handle'],
         );
     }
 
