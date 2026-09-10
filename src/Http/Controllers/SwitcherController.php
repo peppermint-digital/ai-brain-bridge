@@ -150,6 +150,12 @@ class SwitcherController
      */
     public function markup(): string
     {
+        // Abgeschaltet: nichts. Die Direktive ist trotzdem registriert, weil
+        // Blade eine unbekannte Direktive woertlich auf die Seite schreibt.
+        if (! config('ai-brain-bridge.switcher.enabled') || ! config('ai-brain-bridge.login.enabled')) {
+            return '';
+        }
+
         if (! Auth::guard((string) config('ai-brain-bridge.login.guard', 'web'))->check()) {
             return '';
         }

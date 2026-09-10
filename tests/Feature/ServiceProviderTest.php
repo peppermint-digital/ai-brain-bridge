@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Peppermint\AiBrainBridge\AiBrainManager;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
@@ -18,6 +19,15 @@ it('registers the signed inbound webhook route', function () {
 it('merges config with sensible defaults', function () {
     expect(config('ai-brain-bridge.oauth.scope'))->toBe('mcp:use')
         ->and(config('ai-brain-bridge.inbound.route'))->toBe('/webhooks/ai-brain');
+});
+
+it('schreibt @aiBrainSwitcher nicht woertlich auf die Seite, wenn sie abgeschaltet ist', function () {
+    // Blade ueberspringt eine unbekannte Direktive NICHT — sie bliebe als Text
+    // stehen, auf jeder Seite des Produkts. Deshalb wird sie immer registriert
+    // und gibt abgeschaltet nur nichts zurueck (AI Brain #5281).
+    $gerendert = Blade::render('<body>@aiBrainSwitcher</body>');
+
+    expect($gerendert)->toBe('<body></body>');
 });
 
 it('legt ohne Freischaltung keine Umschaltleiste an', function () {

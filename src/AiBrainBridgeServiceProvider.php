@@ -243,6 +243,12 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
      */
     protected function registerSwitcherRoutes(): void
     {
+        // IMMER registrieren, auch abgeschaltet: Eine Blade-Direktive, die es
+        // nicht gibt, wird nicht uebersprungen — Blade laesst `@aiBrainSwitcher`
+        // woertlich stehen und schreibt sie auf jede Seite des Produkts. Der
+        // Schalter gehoert deshalb in die AUSGABE, nicht in die Registrierung.
+        $this->registerSwitcherDirective();
+
         if (! config('ai-brain-bridge.switcher.enabled') || ! config('ai-brain-bridge.login.enabled')) {
             return;
         }
@@ -266,8 +272,6 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
                 [$controller, 'script'],
             )->name('ai-brain-bridge.switcher.script');
         });
-
-        $this->registerSwitcherDirective();
     }
 
     /**
