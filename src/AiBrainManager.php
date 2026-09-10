@@ -10,6 +10,7 @@ use Peppermint\AiBrainBridge\Events\AiBrainEventReceived;
 use Peppermint\AiBrainBridge\Events\Event as BridgeEvent;
 use Peppermint\AiBrainBridge\Events\EventPublisher;
 use Peppermint\AiBrainBridge\Gateway\GatewayClient;
+use Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser;
 use Peppermint\AiBrainBridge\Mcp\McpClient;
 
 /**
@@ -327,9 +328,25 @@ class AiBrainManager
         return $headers;
     }
 
-    public function actingUserHeaders(): array
+    /**
+     * @param  string|null  $behauptet  Ausdruecklich benannte handelnde Person.
+     *                                  Noetig, wo NIEMAND angemeldet ist: Ein
+     *                                  Kundenformular oder ein Hintergrund-Lauf
+     *                                  hat keine Sitzung, aber sehr wohl einen
+     *                                  Menschen, dem der Vorgang gehoert. Ohne
+     *                                  das landet er beim Dienst — und damit
+     *                                  bei niemandem (AI Brain #5243).
+     * @param  string|null  $channel  Woher der Vorgang kam, fuer die Zuordnung
+     *                                im Protokoll.
+     * @return array<string, string>
+     */
+    public function actingUserHeaders(?string $behauptet = null, ?string $channel = null): array
     {
-        if (($email = $this->actingUserEmail()) === null) {
+        $email = $behauptet !== null && trim($behauptet) !== ''
+            ? trim($behauptet)
+            : $this->actingUserEmail();
+
+        if ($email === null) {
             return [];
         }
 
@@ -337,6 +354,10 @@ class AiBrainManager
 
         if (($secret = $this->actingSignatureSecret()) !== null) {
             $headers[McpClient::ACTING_SIG_HEADER] = self::signActingUser($email, $secret);
+        }
+
+        if ($channel !== null && trim($channel) !== '') {
+            $headers[ResolveAiBrainActingUser::CHANNEL_HEADER] = trim($channel);
         }
 
         return $headers;
@@ -365,12 +386,17 @@ class AiBrainManager
      * @param  string|null  $product  Nur, wenn ausdruecklich EIN System gemeint ist.
      * @return array{ok: bool, data: array<mixed>|null, text: string|null, error: string|null, message: string|null, product: string|null}
      */
-    public function gateway(string $capability, array $arguments = [], ?string $product = null): array
-    {
+    public function gateway(
+        string $capability,
+        array $arguments = [],
+        ?string $product = null,
+        ?string $actingAs = null,
+        ?string $channel = null,
+    ): array {
         return (new GatewayClient(
             $this->config,
             $this->tokens,
-            fn (): array => $this->actingUserHeaders(),
+            fn (): array => $this->actingUserHeaders($actingAs, $channel),
         ))->call($capability, $arguments, $product);
     }
 

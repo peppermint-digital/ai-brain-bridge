@@ -89,3 +89,36 @@ it('nennt ein Zielsystem nur, wenn es ausdrücklich gemeint ist', function () {
     AiBrain::gateway('tasks.list', [], 'peppermint-manager');
     Http::assertSent(fn ($a) => str_contains($a->url(), 'gateway') && ($a['product'] ?? null) === 'peppermint-manager');
 });
+
+it('traegt eine ausdruecklich benannte Person mit, wenn niemand angemeldet ist', function () {
+    config()->set('ai-brain-bridge.events.secret', 'geteiltes-secret');
+
+    // Der Manager haelt seine Config vom Bauen fest — nachtraeglich gesetzt
+    // erreicht sie ihn nur, wenn die Instanz neu entsteht. Dieselbe Falle hat
+    // in der Verwaltung dazu gefuehrt, dass ein Test seinen Token bei der
+    // ECHTEN Brain-Instanz geholt hat.
+    app()->forgetInstance(Peppermint\AiBrainBridge\AiBrainManager::class);
+    Illuminate\Support\Facades\Facade::clearResolvedInstance(Peppermint\AiBrainBridge\AiBrainManager::class);
+
+    Http::fake([
+        'brain.test/oauth/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
+        'brain.test/api/v1/gateway' => Http::response(['ok' => true, 'data' => ['id' => 1]]),
+    ]);
+
+    // Kundenformular, Hintergrund-Lauf, externe API: keine Sitzung, aber sehr
+    // wohl ein Mensch, dem der Vorgang gehoert. Ohne diesen Weg landet er beim
+    // Dienst — und damit bei niemandem (AI Brain #5243).
+    AiBrain::gateway('tasks.create', ['title' => 'X'], null, 'haase@peppermint-digital.de', 'verwaltung:kundenformular');
+
+    Http::assertSent(function ($anfrage) {
+        if (! str_contains($anfrage->url(), '/api/v1/gateway')) {
+            return false;
+        }
+
+        return ($anfrage->header('X-AI-Brain-Acting-User')[0] ?? null) === 'haase@peppermint-digital.de'
+            && ($anfrage->header('X-AI-Brain-Channel')[0] ?? null) === 'verwaltung:kundenformular'
+            // Die Behauptung ist signiert — ohne das koennte jeder mit einem
+            // Produkt-Token eine beliebige Person behaupten.
+            && ! empty($anfrage->header('X-AI-Brain-Acting-Sig')[0] ?? null);
+    });
+});
