@@ -99,9 +99,14 @@ return [
     */
     'switcher' => [
         'enabled' => filter_var(env('AI_BRAIN_SWITCHER', false), FILTER_VALIDATE_BOOL),
-        // Wie lange die Liste je Person zwischengespeichert wird. Sie aendert
-        // sich im Monat vielleicht einmal, die Seite laedt aber staendig.
-        'cache_seconds' => (int) env('AI_BRAIN_SWITCHER_CACHE', 300),
+        // Wie lange die Liste je Person zwischengespeichert wird.
+        //
+        // Die SYSTEME aendern sich im Monat vielleicht einmal — dafuer waeren
+        // fuenf Minuten reichlich knapp bemessen. Die MERKZETTEL aendern sich
+        // dagegen mitten im Arbeiten, und sie stehen in derselben Antwort: Wer
+        // in einem System einen anlegt, will ihn im naechsten sehen und nicht
+        // erst nach der Pause. Eine Minute ist der Kompromiss.
+        'cache_seconds' => (int) env('AI_BRAIN_SWITCHER_CACHE', 60),
         'timeout' => (int) env('AI_BRAIN_SWITCHER_TIMEOUT', 8),
         'apps_path' => env('AI_BRAIN_SWITCHER_APPS', '/ai-brain/switcher/apps'),
         'script_path' => env('AI_BRAIN_SWITCHER_SCRIPT', '/ai-brain/switcher/app-switcher.js'),

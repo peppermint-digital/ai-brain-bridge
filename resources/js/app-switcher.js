@@ -13,7 +13,7 @@
  *
  * EINBINDEN:
  *
- *     <script src="/switcher/app-switcher.js?v=12" defer></script>
+ *     <script src="/switcher/app-switcher.js?v=13" defer></script>
  *     <peppermint-app-switcher endpoint="/switcher/apps" aktuell="ai-brain">
  *     </peppermint-app-switcher>
  *
@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.2.2';
+    const VERSION = '1.3.0';
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -95,23 +95,25 @@
          * die sich im Monat vielleicht einmal aendert.
          */
         async laden() {
-            // Hat die Seite die Liste mitgeliefert, ist die Leiste sofort da —
-            // ohne Anfrage, ohne Nachpoppen beim Ankommen. Der Server kennt sie
-            // ohnehin; sie erst zu holen hiess, sie zweimal zu besorgen.
-            const mitgeliefert = this.ausAttribut();
+            // Erst das, was sofort dasteht: die vom Server mitgelieferte Liste
+            // oder der Zwischenspeicher. Damit ist die Leiste ohne Warten da
+            // und poppt beim Ankommen nicht nach.
+            const sofort = this.ausAttribut() ?? this.ausSpeicher();
 
-            if (mitgeliefert !== null) {
-                this.inSpeicher(mitgeliefert);
-                this.zeichnen(mitgeliefert);
-
-                return;
+            if (sofort) {
+                this.zeichnen(sofort);
             }
 
-            const gemerkt = this.ausSpeicher();
-
-            if (gemerkt) {
-                this.zeichnen(gemerkt);
-            }
+            // Und DANACH trotzdem nachfragen, still im Hintergrund.
+            //
+            // Ohne das bliebe ein veralteter Stand stehen, bis der
+            // Zwischenspeicher von selbst ablaeuft: Wer in einem System einen
+            // Merkzettel anlegt, saehe ihn in den anderen minutenlang nicht —
+            // und hielte die Funktion fuer kaputt. Genau so ist es gemeldet
+            // worden.
+            //
+            // Es kostet eine Anfrage nach dem Laden, keine davor. Die Seite
+            // wartet zu keinem Zeitpunkt darauf.
 
             try {
                 const antwort = await fetch(this.getAttribute('endpoint') || '/switcher/apps', {
