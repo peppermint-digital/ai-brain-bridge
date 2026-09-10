@@ -9,6 +9,7 @@ use Peppermint\AiBrainBridge\Config\BridgeConfig;
 use Peppermint\AiBrainBridge\Events\AiBrainEventReceived;
 use Peppermint\AiBrainBridge\Events\Event as BridgeEvent;
 use Peppermint\AiBrainBridge\Events\EventPublisher;
+use Peppermint\AiBrainBridge\Gateway\GatewayClient;
 use Peppermint\AiBrainBridge\Mcp\McpClient;
 
 /**
@@ -350,6 +351,27 @@ class AiBrainManager
     public function call(string $tool, array $arguments = []): array
     {
         return $this->brain()->callTool($tool, $arguments);
+    }
+
+    /**
+     * Einen Vorgang bei einem ANDEREN System ausloesen — ueber Brain (#5243).
+     *
+     *     AiBrain::gateway('tasks.create', ['title' => 'Ticket 5']);
+     *
+     * Ersetzt die Peer-Schiene: Man nennt einen Vorgang, kein Zielsystem. Wer
+     * ihn bedient, weiss das Faehigkeits-Register in Brain.
+     *
+     * @param  array<string, mixed>  $arguments
+     * @param  string|null  $product  Nur, wenn ausdruecklich EIN System gemeint ist.
+     * @return array{ok: bool, data: array<mixed>|null, text: string|null, error: string|null, message: string|null, product: string|null}
+     */
+    public function gateway(string $capability, array $arguments = [], ?string $product = null): array
+    {
+        return (new GatewayClient(
+            $this->config,
+            $this->tokens,
+            fn (): array => $this->actingUserHeaders(),
+        ))->call($capability, $arguments, $product);
     }
 
     public function brain(): McpClient

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @method static array call(string $tool, array $arguments = [])
+ * @method static array gateway(string $capability, array $arguments = [], ?string $product = null)
  * @method static \Peppermint\AiBrainBridge\AiBrainManager resolveActingUserUsing(?callable $resolver)
  * @method static mixed asService(callable $callback)
  * @method static array actingUserHeaders()

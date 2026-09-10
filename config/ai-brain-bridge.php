@@ -110,6 +110,15 @@ return [
     ],
 
     /*
+    | System zu System ueber Brain (AI Brain #5243) — der Ersatz fuer die
+    | Peer-Schiene. Es ist nichts einzurichten: Der Weg nutzt dieselbe
+    | OAuth-Anbindung wie alles andere. Nur die Zeitgrenze steht hier.
+    */
+    'gateway' => [
+        'timeout' => (int) env('AI_BRAIN_GATEWAY_TIMEOUT', 20),
+    ],
+
+    /*
     | MCP — synchrone Daten/Aktionen (Schiene 1).
     */
     'mcp' => [
