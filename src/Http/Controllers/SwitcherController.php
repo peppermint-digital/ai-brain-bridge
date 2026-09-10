@@ -97,14 +97,53 @@ class SwitcherController
         $user = Auth::guard((string) config('ai-brain-bridge.login.guard', 'web'))->user();
 
         if ($user === null) {
-            return response()->json(['apps' => []]);
+            return response()->json(['apps' => [], 'pins' => []]);
         }
 
         $dauer = (int) config('ai-brain-bridge.switcher.cache_seconds', 300);
 
-        $apps = Cache::remember($this->schluessel($user), $dauer, fn (): array => $this->holen());
+        $nutzlast = Cache::remember($this->schluessel($user), $dauer, fn (): array => $this->holen());
 
-        return response()->json(['apps' => $apps]);
+        return response()->json($nutzlast);
+    }
+
+    /**
+     * Anpinnen und Entfernen — durchgereicht an AI Brain (#5320).
+     *
+     * Das Produkt entscheidet NICHTS davon selbst: Ob eine Adresse angepinnt
+     * werden darf, haengt vom Verzeichnis ab, und das kennt nur der Hub. Hier
+     * wird die handelnde Person angehaengt und weitergegeben.
+     *
+     * Danach den Zwischenspeicher vergessen, sonst zeigte die Leiste bis zu
+     * fuenf Minuten lang einen Stand, den die Person gerade selbst geaendert
+     * hat.
+     */
+    public function pins(Request $request): JsonResponse
+    {
+        $user = Auth::guard((string) config('ai-brain-bridge.login.guard', 'web'))->user();
+
+        if ($user === null) {
+            return response()->json(['message' => 'Nicht angemeldet.'], 401);
+        }
+
+        $basis = rtrim((string) config('ai-brain-bridge.base_url'), '/');
+        $methode = $request->isMethod('delete') ? 'delete' : 'post';
+
+        try {
+            $antwort = Http::withToken(app(OAuthTokenProvider::class)->token())
+                ->withHeaders(AiBrain::actingUserHeaders())
+                ->acceptJson()
+                ->timeout((int) config('ai-brain-bridge.switcher.timeout', 8))
+                ->{$methode}($basis.'/api/v1/users/me/switcher-pins', $request->all());
+        } catch (\Throwable $e) {
+            Log::warning('Umschaltleiste: Merkzettel nicht uebermittelt', ['fehler' => $e->getMessage()]);
+
+            return response()->json(['message' => 'AI Brain ist gerade nicht erreichbar.'], 503);
+        }
+
+        Cache::forget($this->schluessel($user));
+
+        return response()->json($antwort->json() ?? [], $antwort->status());
     }
 
     /**
@@ -118,7 +157,7 @@ class SwitcherController
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return array{apps: list<array<string, mixed>>, pins: list<array<string, mixed>>}
      */
     protected function holen(): array
     {
@@ -139,16 +178,17 @@ class SwitcherController
                     'status' => $antwort->status(),
                 ]);
 
-                return [];
+                return ['apps' => [], 'pins' => []];
             }
 
-            $apps = $antwort->json('apps');
-
-            return is_array($apps) ? array_values($apps) : [];
+            return [
+                'apps' => is_array($antwort->json('apps')) ? array_values($antwort->json('apps')) : [],
+                'pins' => is_array($antwort->json('pins')) ? array_values($antwort->json('pins')) : [],
+            ];
         } catch (\Throwable $e) {
             Log::warning('Umschaltleiste: AI Brain nicht erreichbar', ['fehler' => $e->getMessage()]);
 
-            return [];
+            return ['apps' => [], 'pins' => []];
         }
     }
 
@@ -174,6 +214,7 @@ class SwitcherController
 
         $script = e(route('ai-brain-bridge.switcher.script'));
         $endpunkt = e(route('ai-brain-bridge.switcher.apps'));
+        $pins = e(route('ai-brain-bridge.switcher.pins'));
         $slug = e((string) (BridgeConfig::load()['source']
             ?? config('ai-brain-bridge.source')));
 
@@ -195,7 +236,7 @@ class SwitcherController
 
         return <<<HTML
             <script src="{$script}" defer></script>
-            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}"{$liste}></peppermint-app-switcher>
+            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}" pin-endpoint="{$pins}"{$liste}></peppermint-app-switcher>
             HTML;
     }
 

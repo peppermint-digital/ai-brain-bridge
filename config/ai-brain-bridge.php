@@ -106,6 +106,7 @@ return [
         'apps_path' => env('AI_BRAIN_SWITCHER_APPS', '/ai-brain/switcher/apps'),
         'script_path' => env('AI_BRAIN_SWITCHER_SCRIPT', '/ai-brain/switcher/app-switcher.js'),
         'go_path' => env('AI_BRAIN_SWITCHER_GO', '/auth/brain/go'),
+        'pins_path' => env('AI_BRAIN_SWITCHER_PINS', '/ai-brain/switcher/pins'),
         'middleware' => ['web'],
     ],
 

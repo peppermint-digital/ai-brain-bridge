@@ -271,6 +271,12 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
                 (string) config('ai-brain-bridge.switcher.script_path', '/ai-brain/switcher/app-switcher.js'),
                 [$controller, 'script'],
             )->name('ai-brain-bridge.switcher.script');
+
+            // Merkzettel (#5320) — durchgereicht an AI Brain, entschieden dort.
+            Route::match(['post', 'delete'],
+                (string) config('ai-brain-bridge.switcher.pins_path', '/ai-brain/switcher/pins'),
+                [$controller, 'pins'],
+            )->name('ai-brain-bridge.switcher.pins');
         });
     }
 

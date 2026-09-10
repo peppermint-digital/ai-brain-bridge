@@ -13,7 +13,7 @@
  *
  * EINBINDEN:
  *
- *     <script src="/switcher/app-switcher.js?v=9" defer></script>
+ *     <script src="/switcher/app-switcher.js?v=11" defer></script>
  *     <peppermint-app-switcher endpoint="/switcher/apps" aktuell="ai-brain">
  *     </peppermint-app-switcher>
  *
@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.1.0';
+    const VERSION = '1.2.1';
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -38,6 +38,7 @@
         constructor() {
             super();
             this.apps = [];
+            this.pins = [];
             this.offen = false;
             this.schliessUhr = null;
         }
@@ -123,16 +124,19 @@
                 }
 
                 const daten = await antwort.json();
-                const apps = Array.isArray(daten.apps) ? daten.apps : [];
+                const nutzlast = {
+                    apps: Array.isArray(daten.apps) ? daten.apps : [],
+                    pins: Array.isArray(daten.pins) ? daten.pins : [],
+                };
 
-                this.inSpeicher(apps);
-                this.zeichnen(apps);
+                this.inSpeicher(nutzlast);
+                this.zeichnen(nutzlast);
             } catch {
                 // Kein Netz, keine Leiste. Die Seite selbst geht das nichts an.
             }
         }
 
-        /** Die vom Server mitgelieferte Liste — oder null, wenn keine dasteht. */
+        /** Die vom Server mitgelieferte Nutzlast — oder null, wenn keine dasteht. */
         ausAttribut() {
             const roh = this.getAttribute('apps');
 
@@ -141,12 +145,30 @@
             }
 
             try {
-                const apps = JSON.parse(roh);
-
-                return Array.isArray(apps) ? apps : null;
+                return this.normalisieren(JSON.parse(roh));
             } catch {
                 return null;
             }
+        }
+
+        /**
+         * Eine blosse Liste ist die alte Form (nur Systeme). Sie muss weiter
+         * gelesen werden koennen: Waehrend eines gestaffelten Rollouts liefert
+         * ein noch nicht aktualisiertes Produkt genau die.
+         */
+        normalisieren(roh) {
+            if (Array.isArray(roh)) {
+                return { apps: roh, pins: [] };
+            }
+
+            if (roh && typeof roh === 'object') {
+                return {
+                    apps: Array.isArray(roh.apps) ? roh.apps : [],
+                    pins: Array.isArray(roh.pins) ? roh.pins : [],
+                };
+            }
+
+            return null;
         }
 
         ausSpeicher() {
@@ -157,17 +179,17 @@
                     return null;
                 }
 
-                const { zeit, apps } = JSON.parse(roh);
+                const { zeit, nutzlast } = JSON.parse(roh);
 
-                return Date.now() - zeit < HALTBAR && Array.isArray(apps) ? apps : null;
+                return Date.now() - zeit < HALTBAR ? this.normalisieren(nutzlast) : null;
             } catch {
                 return null;
             }
         }
 
-        inSpeicher(apps) {
+        inSpeicher(nutzlast) {
             try {
-                sessionStorage.setItem(SPEICHER, JSON.stringify({ zeit: Date.now(), apps }));
+                sessionStorage.setItem(SPEICHER, JSON.stringify({ zeit: Date.now(), nutzlast }));
             } catch {
                 // Privates Fenster o.ae. — dann eben jedes Mal frisch fragen.
             }
@@ -175,12 +197,14 @@
 
         /* ---------------------------------------------------------------- */
 
-        zeichnen(apps) {
-            this.apps = apps;
+        zeichnen(nutzlast) {
+            this.apps = nutzlast.apps;
+            this.pins = nutzlast.pins;
 
-            // Ein einziger Eintrag heisst: es gibt nichts zu wechseln. Dann
-            // ist auch der Griff zu viel — er verspraeche eine Wahl.
-            const zeigen = apps.length > 1;
+            // Ein einziger Eintrag und kein Merkzettel heisst: es gibt nichts
+            // zu wechseln. Dann ist auch der Griff zu viel — er verspraeche
+            // eine Wahl.
+            const zeigen = this.apps.length > 1 || this.pins.length > 0;
 
             this.wrap.hidden = !zeigen;
 
@@ -188,36 +212,63 @@
                 return;
             }
 
-            this.leiste.innerHTML = apps
-                .map((app) => {
-                    const aktuell = app.aktuell === true;
-                    const ziel = aktuell ? '' : ` href="${this.sicher(app.url)}"`;
+            const systeme = this.apps.map((app) => {
+                const aktuell = app.aktuell === true;
+                const ziel = aktuell ? '' : ` href="${this.sicher(app.url)}"`;
 
-                    // Das Kuerzel liegt UNTER dem Bild, nicht statt seiner:
-                    // Faellt das Icon aus, steht dort weiter etwas Lesbares,
-                    // statt eines leeren Kreises.
-                    return `
-                        <a class="knopf${aktuell ? ' ist-hier' : ''}"${ziel}
-                           ${aktuell ? 'aria-current="page" tabindex="-1"' : ''}
-                           aria-label="${this.sicher(app.name)}">
-                            <span class="kachel" style="--farbe: ${this.sicher(app.farbe)}">
-                                <span class="kuerzel">${this.sicher(app.kuerzel)}</span>
-                                <img src="${this.sicher(app.icon)}" alt=""
-                                     data-ersatz="${this.sicher(app.icon_ersatz || '')}"
-                                     decoding="async">
-                            </span>
-                            <span class="hinweis" role="tooltip">${this.sicher(app.name)}</span>
-                        </a>`;
-                })
-                .join('');
+                // Das Kuerzel liegt UNTER dem Bild, nicht statt seiner:
+                // Faellt das Icon aus, steht dort weiter etwas Lesbares,
+                // statt einer leeren Kachel.
+                return `
+                    <a class="knopf${aktuell ? ' ist-hier' : ''}"${ziel}
+                       ${aktuell ? 'aria-current="page" tabindex="-1"' : ''}
+                       aria-label="${this.sicher(app.name)}">
+                        <span class="kachel" style="--farbe: ${this.sicher(app.farbe)}">
+                            <span class="kuerzel">${this.sicher(app.kuerzel)}</span>
+                            <img src="${this.sicher(app.icon)}" alt=""
+                                 data-ersatz="${this.sicher(app.icon_ersatz || '')}"
+                                 decoding="async">
+                        </span>
+                        <span class="hinweis" role="tooltip">${this.sicher(app.name)}</span>
+                    </a>`;
+            });
 
-            // KEIN loading="lazy": Die Leiste ist eingeklappt, solange niemand
-            // sie oeffnet — ein verzoegertes Bild in einem verborgenen Element
-            // laedt der Browser gar nicht erst, und beim ersten Ausfahren
-            // stuenden dort vier leere Kacheln.
-            //
-            // Ein Icon, das nicht kommt, darf keine leere Kachel hinterlassen:
-            // erst die zweite Adresse versuchen, dann das Bild ganz entfernen.
+            const merkzettel = this.pins.map((pin) => `
+                <span class="pin-huelle">
+                    <a class="knopf pin" href="${this.sicher(pin.url)}"
+                       aria-label="${this.sicher(pin.label)}">
+                        <span class="pin-kachel" style="--farbe: ${this.sicher(pin.farbe)}">
+                            ${this.sicher(this.pinKuerzel(pin.label))}
+                        </span>
+                        <span class="hinweis" role="tooltip">${this.sicher(pin.label)}</span>
+                    </a>
+                    <button class="loesen" type="button" data-pin="${this.sicher(pin.id)}"
+                            aria-label="${this.sicher(pin.label)} entfernen">&times;</button>
+                </span>`);
+
+            // Der Strich trennt zwei Dinge, die verschieden funktionieren:
+            // links die Systeme (immer da, vom Verzeichnis bestimmt), rechts
+            // die eigenen Merkzettel (selbst abgelegt, jederzeit loeschbar).
+            const trenner = (merkzettel.length > 0 || this.kannAnpinnen()) && systeme.length > 0
+                ? '<span class="trenner" aria-hidden="true"></span>'
+                : '';
+
+            this.leiste.innerHTML = systeme.join('') + trenner + merkzettel.join('') + this.anpinnKnopf();
+
+            this.bilderAbsichern();
+            this.knoepfeVerdrahten();
+        }
+
+        /**
+         * Ein Bild, das nicht kommt, darf keine leere Kachel hinterlassen:
+         * erst die zweite Adresse versuchen, dann das Bild ganz entfernen.
+         *
+         * KEIN loading="lazy" an den Bildern: Die Leiste ist eingeklappt,
+         * solange niemand sie oeffnet — ein verzoegertes Bild in einem
+         * verborgenen Element laedt der Browser gar nicht erst, und beim ersten
+         * Ausfahren stuenden dort leere Kacheln.
+         */
+        bilderAbsichern() {
             this.leiste.querySelectorAll('img').forEach((bild) => {
                 bild.addEventListener('error', () => {
                     const ersatz = bild.dataset.ersatz;
@@ -233,6 +284,178 @@
                     bild.remove();
                 });
             });
+        }
+
+        /**
+         * Zwei Buchstaben aus dem Titel — mehr passt nicht auf eine Kachel.
+         *
+         * Bei mehreren Woertern die Anfangsbuchstaben der ersten beiden
+         * („Offene Rechnungen" → „OR"), sonst die ersten beiden Zeichen.
+         */
+        pinKuerzel(label) {
+            const text = String(label ?? '').trim();
+
+            if (text === '') {
+                return '?';
+            }
+
+            // Bindestriche und Schrägstriche sind keine Woerter. „Tasks - AI
+            // Brain" ergaebe sonst „T-".
+            const woerter = text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
+
+            if (woerter.length === 0) {
+                return text.slice(0, 2).toUpperCase();
+            }
+
+            return woerter.length >= 2
+                ? (woerter[0][0] + woerter[1][0]).toUpperCase()
+                : woerter[0].slice(0, 2).toUpperCase();
+        }
+
+        /**
+         * Der Seitentitel ohne den Anwendungsnamen.
+         *
+         * Fast jede Seite haengt ihn an („Tasks - AI Brain"). Auf einem
+         * Merkzettel IN dieser Anwendung ist er ueberfluessig — er steht in
+         * jedem Eintrag und sagt nichts, was der Farbstreifen nicht schon
+         * zeigt.
+         */
+        titelKuerzen(titel) {
+            const hier = this.apps.find((app) => app.aktuell === true);
+            const name = hier?.name ?? '';
+            let text = String(titel ?? '').trim();
+
+            if (name !== '') {
+                for (const trenner of [' - ', ' – ', ' — ', ' | ']) {
+                    if (text.endsWith(trenner + name)) {
+                        text = text.slice(0, -(trenner + name).length).trim();
+                        break;
+                    }
+                }
+            }
+
+            return text !== '' ? text : (titel ?? '').trim();
+        }
+
+        /**
+         * Laesst sich die Seite, auf der wir gerade stehen, anpinnen?
+         *
+         * Nein, wenn sie schon drin ist — sonst waere der Knopf eine Einladung
+         * zum Doppelten. Und nein, wenn gar keine Adresse zum Ablegen bekannt
+         * ist.
+         */
+        kannAnpinnen() {
+            if (!this.getAttribute('pin-endpoint')) {
+                return false;
+            }
+
+            return !this.pins.some((pin) => pin.url === location.href);
+        }
+
+        anpinnKnopf() {
+            if (!this.kannAnpinnen()) {
+                return '';
+            }
+
+            return `
+                <button class="anpinnen" type="button"
+                        aria-label="Diese Seite anpinnen">
+                    <span class="plus" aria-hidden="true">+</span>
+                    <span class="hinweis" role="tooltip">Diese Seite anpinnen</span>
+                </button>`;
+        }
+
+        knoepfeVerdrahten() {
+            this.leiste.querySelector('.anpinnen')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.anpinnen();
+            });
+
+            this.leiste.querySelectorAll('.loesen').forEach((knopf) => {
+                knopf.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.loesen(knopf.dataset.pin);
+                });
+            });
+        }
+
+        /**
+         * Die aktuelle Seite ablegen.
+         *
+         * Titel und Adresse kommen aus dem Dokument — niemand soll etwas
+         * abtippen muessen. Der Server prueft trotzdem beides; er darf sich auf
+         * nichts verlassen, was von hier kommt.
+         */
+        async anpinnen() {
+            const label = this.titelKuerzen(document.title || location.pathname).slice(0, 80);
+
+            const neuerPin = await this.schicken('POST', {
+                url: location.href,
+                label,
+                product_slug: this.getAttribute('aktuell') || '',
+            });
+
+            if (neuerPin === null) {
+                return;
+            }
+
+            this.pins = [...this.pins, neuerPin];
+            this.inSpeicher({ apps: this.apps, pins: this.pins });
+            this.zeichnen({ apps: this.apps, pins: this.pins });
+        }
+
+        async loesen(id) {
+            if (await this.schicken('DELETE', { id }) === null) {
+                return;
+            }
+
+            this.pins = this.pins.filter((pin) => String(pin.id) !== String(id));
+            this.inSpeicher({ apps: this.apps, pins: this.pins });
+            this.zeichnen({ apps: this.apps, pins: this.pins });
+        }
+
+        /**
+         * Schreiben gegen den eigenen Server.
+         *
+         * Der Sitzungsschutz (CSRF) kommt aus dem Keks, den Laravel setzt —
+         * derselbe Weg, den auch die Anwendung drumherum nimmt. Ohne ihn lehnt
+         * der Server ab, und die Leiste taete stumm nichts.
+         */
+        async schicken(methode, daten) {
+            const ziel = this.getAttribute('pin-endpoint');
+
+            if (!ziel) {
+                return null;
+            }
+
+            try {
+                const antwort = await fetch(ziel, {
+                    method: methode,
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-XSRF-TOKEN': this.sitzungsschutz(),
+                    },
+                    body: JSON.stringify(daten),
+                });
+
+                if (!antwort.ok) {
+                    return null;
+                }
+
+                const inhalt = await antwort.json();
+
+                return inhalt.pin ?? true;
+            } catch {
+                return null;
+            }
+        }
+
+        sitzungsschutz() {
+            const treffer = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+
+            return treffer ? decodeURIComponent(treffer[1]) : '';
         }
 
         /** Die Liste kommt vom eigenen Server — trotzdem nichts ungeprueft ins Markup. */
@@ -538,6 +761,89 @@
     .knopf.ist-hier .kachel img { opacity: 1; }
     .knopf.ist-hier:hover .kachel { transform: none; }
 
+    /* Trennt Systeme von Merkzetteln. Links steht, was das Verzeichnis
+       bestimmt; rechts, was man sich selbst abgelegt hat. */
+    .trenner {
+        width: 1px;
+        align-self: stretch;
+        margin: 4px 2px;
+        background: var(--rand);
+    }
+
+    /*
+     * Ein Merkzettel sieht bewusst ANDERS aus als ein System: kein Logo,
+     * schmaler, Buchstaben statt Bild. Saehe er gleich aus, wuerde man ihn fuer
+     * eine weitere Anwendung halten — und sich wundern, dass er verschwindet,
+     * wenn man ihn entfernt.
+     */
+    .pin-huelle { position: relative; display: block; }
+
+    .pin-kachel {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 38px;
+        border-radius: 10px;
+        background: var(--rand);
+        color: var(--schrift);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        /* Der farbige Streifen sagt, in welchem System die Seite liegt. */
+        box-shadow: inset 0 -3px 0 0 var(--farbe, #64748b);
+        transition: transform 140ms ease;
+    }
+
+    .knopf.pin:hover .pin-kachel,
+    .knopf.pin:focus-visible .pin-kachel { transform: scale(1.06); }
+
+    /* Das Entfernen taucht erst auf, wenn man den Merkzettel meint. */
+    .loesen {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        width: 16px;
+        height: 16px;
+        padding: 0;
+        border: 1px solid var(--rand);
+        border-radius: 50%;
+        background: var(--grund);
+        color: var(--gedaempft);
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 120ms ease;
+    }
+
+    .pin-huelle:hover .loesen,
+    .loesen:focus-visible { opacity: 1; }
+
+    .loesen:hover { color: var(--schrift); }
+
+    /* Anpinnen: gestrichelt, weil dort noch nichts ist. */
+    .anpinnen {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        width: 34px;
+        height: 38px;
+        padding: 0;
+        border: 1px dashed var(--rand);
+        border-radius: 10px;
+        background: none;
+        color: var(--gedaempft);
+        cursor: pointer;
+        transition: color 140ms ease, border-color 140ms ease;
+    }
+
+    .anpinnen:hover,
+    .anpinnen:focus-visible { color: var(--schrift); border-color: var(--gedaempft); }
+
+    .plus { font-size: 16px; line-height: 1; }
+
     /* Der Name erscheint erst beim Zeigen — vier Beschriftungen nebeneinander
        machen aus der Leiste eine Liste. */
     .hinweis {
@@ -564,7 +870,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .griff, .leiste, .kachel, .hinweis { transition: none; }
+        .griff, .leiste, .kachel, .pin-kachel, .hinweis, .loesen, .anpinnen { transition: none; }
     }
 
     /* Ausdruecklich abgeschaltet (Avatar-Vollbild, Praesentation). */
