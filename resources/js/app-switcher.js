@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.4.0';
+    const VERSION = '1.4.1';
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -390,11 +390,20 @@
             const drin = this.hierAngepinnt();
             const text = drin ? 'Diese Seite ist angepinnt — Klick nimmt sie heraus' : 'Diese Seite anpinnen';
 
+            // Im Ruhezustand IMMER dasselbe: graues gestricheltes Kaestchen mit
+            // Plus. Das Problem war nie das Zeichen, sondern dass der Knopf
+            // ganz verschwand — daran war nicht zu erkennen, ob die Funktion
+            // fehlt, kaputt ist oder ihre Arbeit getan hat.
+            //
+            // Ist die Seite schon drin, dreht sich das Plus beim Zeigen zum
+            // Kreuz (dieselbe Form, 45 Grad) und der Hinweis sagt es. Der
+            // Zustand ist damit da, wo man ihn braucht — beim Hinsehen, nicht
+            // die ganze Zeit.
             return `
                 <button class="anpinnen${drin ? ' ist-drin' : ''}" type="button"
                         aria-pressed="${drin ? 'true' : 'false'}"
                         aria-label="${this.sicher(text)}">
-                    <span class="plus" aria-hidden="true">${drin ? '&#10003;' : '+'}</span>
+                    <span class="plus" aria-hidden="true">+</span>
                     <span class="hinweis" role="tooltip">${this.sicher(text)}</span>
                 </button>`;
         }
@@ -885,15 +894,16 @@
     .anpinnen:hover,
     .anpinnen:focus-visible { color: var(--schrift); border-color: var(--gedaempft); }
 
-    /* Angepinnt: durchgezogen statt gestrichelt — der Zustand ist zu sehen,
-       nicht aus einer Abwesenheit zu erschliessen. */
-    .anpinnen.ist-drin {
-        border-style: solid;
-        border-color: var(--gedaempft);
-        color: var(--schrift);
-    }
+    /* Schon angepinnt: im Ruhezustand nicht zu unterscheiden — erst beim
+       Zeigen dreht sich das Plus zum Kreuz und der Hinweis sagt, was ein Klick
+       tut. */
+    .plus { transition: transform 140ms ease; }
+
+    .anpinnen.ist-drin:hover .plus,
+    .anpinnen.ist-drin:focus-visible .plus { transform: rotate(45deg); }
 
     .plus { font-size: 16px; line-height: 1; }
+
 
     /* Der Name erscheint erst beim Zeigen — vier Beschriftungen nebeneinander
        machen aus der Leiste eine Liste. */
@@ -921,7 +931,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .griff, .leiste, .kachel, .pin-kachel, .hinweis, .loesen, .anpinnen { transition: none; }
+        .griff, .leiste, .kachel, .pin-kachel, .hinweis, .loesen, .anpinnen, .plus { transition: none; }
     }
 
     /* Ausdruecklich abgeschaltet (Avatar-Vollbild, Praesentation). */
