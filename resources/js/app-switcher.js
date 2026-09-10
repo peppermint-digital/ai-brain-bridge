@@ -24,7 +24,50 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.6.0';
+    const VERSION = '1.7.0';
+
+    /**
+     * Die Symbole, die ein Merkzettel tragen kann (#5320).
+     *
+     * ## Warum hier und nicht im Server
+     *
+     * Ueber die Leitung geht nur ein SCHLUESSEL. Wie er aussieht, entscheidet
+     * die Leiste — sonst stuende Markup aus der Datenbank in einer Anzeige, die
+     * auf JEDER Seite ALLER vier Systeme eingeblendet wird.
+     *
+     * Brain fuehrt dieselben Schluessel als Erlaubnisliste. Laufen beide
+     * auseinander, ist der Ausgang gutmuetig: Ein unbekannter Schluessel faellt
+     * hier durch und der Merkzettel zeigt wieder seine Anfangsbuchstaben.
+     *
+     * Alle Pfade zeichnen in `currentColor` und ohne Fuellung — damit sie in
+     * hell und dunkel gleich gut sitzen und die Farbe des Systems, die als
+     * Streifen unter der Kachel liegt, nicht stoeren.
+     */
+    const SYMBOLE = {
+        mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
+        kalender: 'M4 6h16v14H4zM8 3v4M16 3v4M4 10h16',
+        datei: 'M6 3h8l4 4v14H6zM14 3v5h4',
+        ordner: 'M3 7h6l2 2h10v10H3z',
+        person: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c0-4 4-6 8-6s8 2 8 6',
+        gruppe: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 19c0-3.3 3.1-5 7-5s7 1.7 7 5M17 6.2a3 3 0 0 1 0 5.6M18 14.5c2.4.6 4 2 4 4.5',
+        haus: 'M4 11l8-7 8 7M6 10v10h12V10',
+        stern: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z',
+        herz: 'M12 20S4.5 15.3 4.5 10.3A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7.5 2.3C19.5 15.3 12 20 12 20z',
+        fahne: 'M6 3v18M6 4h12l-2.5 4L18 12H6',
+        lupe: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM16.2 16.2L21 21',
+        uhr: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3.2 2',
+        chat: 'M4 5h16v11H9l-5 4z',
+        telefon: 'M6.5 3h3.2l1.8 4.4-2.4 1.5a12.5 12.5 0 0 0 5.9 5.9l1.5-2.4L21 14.3v3.2a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.2 2 2 0 0 1 6.5 3z',
+        ort: 'M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+        euro: 'M17.5 6.5a7 7 0 1 0 0 11M4 10h9M4 14h9',
+        diagramm: 'M4 20V10M10 20V4M16 20v-7M3 20h18',
+        haken: 'M4 12.5l5 5L20 6.5',
+        zahnrad: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19',
+        buch: 'M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM17 7h2v13H8',
+        paket: 'M12 3l8 4v10l-8 4-8-4V7zM4 7l8 4 8-4M12 11v10',
+        gluehbirne: 'M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z',
+    };
+
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -241,12 +284,12 @@
                     <a class="knopf pin" href="${this.sicher(pin.url)}"
                        aria-label="${this.sicher(pin.label)}">
                         <span class="pin-kachel" style="--farbe: ${this.sicher(pin.farbe)}">
-                            ${this.sicher(this.pinKuerzel(pin.label))}
+                            ${this.pinInhalt(pin)}
                         </span>
                         <span class="hinweis" role="tooltip">${this.sicher(pin.label)}</span>
                     </a>
                     <button class="umbenennen" type="button" data-pin="${this.sicher(pin.id)}"
-                            aria-label="${this.sicher(pin.label)} umbenennen">&#9998;</button>
+                            aria-label="${this.sicher(pin.label)} bearbeiten">&#9998;</button>
                     <button class="loesen" type="button" data-pin="${this.sicher(pin.id)}"
                             aria-label="${this.sicher(pin.label)} entfernen">&times;</button>
                 </span>`);
@@ -297,6 +340,39 @@
          * Bei mehreren Woertern die Anfangsbuchstaben der ersten beiden
          * („Offene Rechnungen" → „OR"), sonst die ersten beiden Zeichen.
          */
+        /**
+         * Was in der Kachel steht: das gewaehlte Symbol — sonst die Buchstaben.
+         *
+         * Die Reihenfolge ist der ganze Punkt. Ein unbekannter Schluessel (eine
+         * aeltere Leiste, ein neu hinzugekommenes Symbol) faellt hier durch und
+         * landet bei den Anfangsbuchstaben. Der Merkzettel bleibt damit unter
+         * allen Umstaenden benutzbar; das Symbol ist Schmuck, keine Bedingung.
+         */
+        pinInhalt(pin) {
+            return this.symbolBild(pin.symbol)
+                || `<span class="kuerzel-pin">${this.sicher(this.pinKuerzel(pin.label))}</span>`;
+        }
+
+        /**
+         * Ein Symbol als SVG — oder nichts, wenn der Schluessel unbekannt ist.
+         *
+         * Der Pfad stammt aus SYMBOLE, nie aus den Daten. Deshalb ist das hier
+         * die einzige Stelle der Leiste, die Markup zusammensetzt, ohne den
+         * Inhalt vorher durch `sicher()` zu schicken — er kommt nicht von
+         * aussen.
+         */
+        symbolBild(schluessel) {
+            const pfad = SYMBOLE[schluessel];
+
+            if (!pfad) {
+                return '';
+            }
+
+            return `<svg class="symbol" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+                         stroke="currentColor" stroke-width="1.7"
+                         stroke-linecap="round" stroke-linejoin="round"><path d="${pfad}"/></svg>`;
+        }
+
         pinKuerzel(label) {
             const text = String(label ?? '').trim();
 
@@ -458,7 +534,7 @@
 
             this.leiste.querySelector('.anpinnen')?.remove();
 
-            const feld = this.feldOeffnen(vorschlag, (name) => this.anpinnen(name));
+            const feld = this.feldOeffnen(vorschlag, (name, symbol) => this.anpinnen(name, symbol));
 
             feld.focus();
             feld.select();
@@ -470,24 +546,65 @@
          * Zwei Felder mit derselben Aufgabe waeren zwei Stellen, an denen das
          * Abbrechen unterschiedlich funktioniert.
          */
-        feldOeffnen(vorbelegung, beimBestaetigen) {
+        feldOeffnen(vorbelegung, beimBestaetigen, symbolVorbelegung = null) {
+            this.gewaehltesSymbol = symbolVorbelegung;
+
+            const huelle = document.createElement('span');
+            huelle.className = 'eingabe-huelle';
+
             const feld = document.createElement('input');
             feld.className = 'eingabe';
             feld.type = 'text';
             feld.value = vorbelegung;
             feld.maxLength = 80;
             feld.setAttribute('aria-label', 'Name des Merkzettels');
-            this.leiste.appendChild(feld);
+
+            huelle.appendChild(feld);
+            huelle.appendChild(this.symbolwahlBauen());
+            this.leiste.appendChild(huelle);
 
             // Solange getippt wird, darf die Leiste nicht zufahren — sonst ist
             // die Eingabe weg, sobald die Maus danebengeraet.
             this.bearbeitet = true;
 
+            // Ein Klick auf ein Symbol nimmt dem Feld den Fokus, und ein
+            // verlorener Fokus gilt hier als Abbruch. Deshalb wird der Fokus
+            // beim Druecken erst gar nicht abgegeben: `mousedown` abfangen ist
+            // die einzige Stelle, an der das noch geht — `click` kommt zu spaet,
+            // der Abbruch waere schon gelaufen.
+            huelle.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.symbolknopf')) {
+                    e.preventDefault();
+                }
+            });
+
+            huelle.addEventListener('click', (e) => {
+                const knopf = e.target.closest('.symbolknopf');
+
+                if (!knopf) {
+                    return;
+                }
+
+                const wahl = knopf.dataset.symbol || null;
+
+                // Noch einmal auf dasselbe Symbol heisst abwaehlen. Sonst gaebe
+                // es keinen Weg zurueck zu den Buchstaben, ausser den ganzen
+                // Merkzettel neu anzulegen.
+                this.gewaehltesSymbol = this.gewaehltesSymbol === wahl ? null : wahl;
+
+                huelle.querySelectorAll('.symbolknopf').forEach((k) => {
+                    k.classList.toggle('gewaehlt', k.dataset.symbol === this.gewaehltesSymbol);
+                    k.setAttribute('aria-pressed', String(k.dataset.symbol === this.gewaehltesSymbol));
+                });
+
+                feld.focus();
+            });
+
             feld.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     this.bearbeitet = false;
-                    beimBestaetigen(feld.value.trim() || vorbelegung);
+                    beimBestaetigen(feld.value.trim() || vorbelegung, this.gewaehltesSymbol);
                 }
 
                 if (e.key === 'Escape') {
@@ -498,13 +615,45 @@
 
             feld.addEventListener('blur', () => {
                 // Ein Klick daneben ist ein Abbruch, kein Verlust: Was getippt
-                // wurde, war noch nicht abgelegt.
-                if (this.bearbeitet) {
-                    this.abbrechen();
-                }
+                // wurde, war noch nicht abgelegt. Der Aufschub um einen Zug
+                // laesst dem Symbol-Klick oben den Vortritt, der den Fokus
+                // sofort zurueckholt.
+                setTimeout(() => {
+                    if (this.bearbeitet && !huelle.contains(document.activeElement)) {
+                        this.abbrechen();
+                    }
+                }, 0);
             });
 
             return feld;
+        }
+
+        /**
+         * Die Symbolauswahl unter dem Namensfeld.
+         *
+         * Als Raster und nicht als Ausklappliste: Symbole erkennt man im
+         * Nebeneinander, eine Liste zwaenge sie in eine Reihenfolge, die
+         * niemand kennt. Wer keines will, waehlt einfach keines — es gibt
+         * bewusst KEINEN „ohne"-Knopf, denn nichts zu waehlen ist der
+         * Ausgangszustand und braucht keine eigene Schaltflaeche.
+         */
+        symbolwahlBauen() {
+            const wahl = document.createElement('span');
+            wahl.className = 'symbolwahl';
+            wahl.setAttribute('role', 'group');
+            wahl.setAttribute('aria-label', 'Symbol des Merkzettels');
+
+            wahl.innerHTML = Object.keys(SYMBOLE).map((schluessel) => {
+                const drin = schluessel === this.gewaehltesSymbol;
+
+                return `<button class="symbolknopf${drin ? ' gewaehlt' : ''}" type="button"
+                                data-symbol="${this.sicher(schluessel)}"
+                                aria-pressed="${drin}"
+                                aria-label="${this.sicher(schluessel)}"
+                                title="${this.sicher(schluessel)}">${this.symbolBild(schluessel)}</button>`;
+            }).join('');
+
+            return wahl;
         }
 
         /**
@@ -521,8 +670,8 @@
                 return;
             }
 
-            const feld = this.feldOeffnen(pin.label, async (name) => {
-                const geaendert = await this.schicken('PATCH', { id: pin.id, label: name });
+            const feld = this.feldOeffnen(pin.label, async (name, symbol) => {
+                const geaendert = await this.schicken('PATCH', { id: pin.id, label: name, symbol });
 
                 if (geaendert === null) {
                     this.abbrechen();
@@ -533,7 +682,7 @@
                 this.pins = this.pins.map((p) => (String(p.id) === String(id) ? geaendert : p));
                 this.inSpeicher({ apps: this.apps, pins: this.pins });
                 this.zeichnen({ apps: this.apps, pins: this.pins });
-            });
+            }, pin.symbol ?? null);
 
             feld.focus();
             feld.select();
@@ -551,11 +700,12 @@
          * abtippen muessen. Der Server prueft trotzdem beides; er darf sich auf
          * nichts verlassen, was von hier kommt.
          */
-        async anpinnen(label) {
+        async anpinnen(label, symbol = null) {
 
             const neuerPin = await this.schicken('POST', {
                 url: location.href,
                 label,
+                symbol,
                 product_slug: this.getAttribute('aktuell') || '',
             });
 
@@ -1054,6 +1204,69 @@
 
     .eingabe::placeholder { color: var(--gedaempft); }
 
+    /* Symbol in der Kachel — gleiche Groesse wie die Buchstaben vorher, damit
+       gemischte Merkzettel (mit und ohne Symbol) auf einer Linie stehen. */
+    .symbol {
+        width: 18px;
+        height: 18px;
+        display: block;
+    }
+
+    .kuerzel-pin { line-height: 1; }
+
+    /* Das Feld traegt die Auswahl, damit sie sich mit ihm bewegt. */
+    .eingabe-huelle {
+        position: relative;
+        display: inline-flex;
+    }
+
+    /* Das Raster haengt UNTER der Leiste, nicht in ihr: Die Leiste ist ein
+       schmaler Streifen, 22 Symbole nebeneinander waeren breiter als der
+       Bildschirm. Und es faehrt nicht ein — wer den Stift drueckt, will es
+       sofort sehen. */
+    .symbolwahl {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        padding: 6px;
+        border: 1px solid var(--rand);
+        border-radius: 12px;
+        background: var(--grund);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    .symbolknopf {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: none;
+        color: var(--gedaempft);
+        cursor: pointer;
+    }
+
+    .symbolknopf:hover,
+    .symbolknopf:focus-visible {
+        color: var(--schrift);
+        background: var(--rand);
+    }
+
+    /* Das Gewaehlte muss sich auch ohne Farbe unterscheiden — deshalb Rahmen
+       UND Flaeche, nicht nur ein Farbton. */
+    .symbolknopf.gewaehlt {
+        color: var(--schrift);
+        border-color: var(--gedaempft);
+        background: var(--rand);
+    }
+
 
     /* Der Name erscheint erst beim Zeigen — vier Beschriftungen nebeneinander
        machen aus der Leiste eine Liste. */
@@ -1081,7 +1294,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .griff, .leiste, .kachel, .pin-kachel, .hinweis, .loesen, .umbenennen, .anpinnen, .plus { transition: none; }
+        .griff, .leiste, .kachel, .pin-kachel, .hinweis, .loesen, .umbenennen, .anpinnen, .plus, .symbolknopf { transition: none; }
     }
 
     /* Ausdruecklich abgeschaltet (Avatar-Vollbild, Praesentation). */
