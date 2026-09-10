@@ -29,6 +29,7 @@ use Peppermint\AiBrainBridge\Http\Controllers\ConnectController;
 use Peppermint\AiBrainBridge\Http\Controllers\InboundEventController;
 use Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController;
 use Peppermint\AiBrainBridge\Http\Controllers\SwitcherController;
+use Peppermint\AiBrainBridge\Http\Middleware\LokalerLoginRiegel;
 use Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser;
 use Peppermint\AiBrainBridge\Http\Middleware\ResolvePeerActingUser;
 use Peppermint\AiBrainBridge\Http\Middleware\VerifyAiBrainSignature;
@@ -125,6 +126,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             ]);
         }
 
+        $this->registerLokalenLoginRiegel();
         $this->registerSitzungsEntzug();
         $this->registerInboundRoute();
         $this->registerConnectRoute();
@@ -330,6 +332,34 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
      * den man einschalten muss, ist bei dem einen Produkt aus, bei dem es
      * darauf ankommt. Kommt kein solches Ereignis, tut der Listener nichts.
      */
+    /**
+     * Den lokalen Anmeldeweg verengen, wenn das Produkt es einstellt
+     * (AI Brain #5346).
+     *
+     * Nur ein KUERZEL — das Produkt haengt es selbst an seine Anmelderoute:
+     *
+     *     Route::post('login', [...])->middleware('ai-brain.local-login');
+     *
+     * ## Warum nicht in die `web`-Gruppe schieben
+     *
+     * Das waere bequemer und aus zwei Gruenden schlechter. Erstens liefe die
+     * Middleware dann bei JEDER Anfrage des Produkts mit, obwohl sie nur eine
+     * einzige Route angeht. Zweitens ist ein Paket, das sich still in die
+     * Middleware-Kette des Gastgebers einhaengt, schwer zu durchschauen: Wer
+     * spaeter sucht, warum eine Anmeldung abgewiesen wird, findet an der Route
+     * nichts.
+     *
+     * Der ausdrueckliche Weg kostet eine Zeile je Produkt und ist dafuer dort
+     * zu sehen, wo er wirkt.
+     */
+    protected function registerLokalenLoginRiegel(): void
+    {
+        $this->app['router']->aliasMiddleware(
+            'ai-brain.local-login',
+            LokalerLoginRiegel::class,
+        );
+    }
+
     protected function registerSitzungsEntzug(): void
     {
         Event::listen(

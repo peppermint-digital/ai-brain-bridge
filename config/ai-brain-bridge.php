@@ -81,6 +81,26 @@ return [
         'middleware' => ['web'],
         'timeout' => (int) env('AI_BRAIN_LOGIN_TIMEOUT', 15),
         'button_label' => env('AI_BRAIN_LOGIN_LABEL', 'Mit AI Brain anmelden'),
+
+        /*
+        | Der LOKALE Anmeldeweg (AI Brain #5346).
+        |
+        | 'an'        — unveraendert, jeder kann sich mit Passwort anmelden.
+        | 'notzugang' — nur noch die unten genannten Adressen; alle anderen
+        |               gehen ueber AI Brain, und damit gilt dessen Passwort-
+        |               und MFA-Richtlinie auch hier.
+        |
+        | VORGABE IST 'an'. Ein Riegel, der sich beim Einspielen des Pakets von
+        | selbst schliesst, sperrt beim ersten Deploy alle aus.
+        |
+        | Die Ausnahmeliste ist der Notzugang: Faellt AI Brain aus, kommen diese
+        | Menschen trotzdem herein — um zu arbeiten oder zu reparieren. Sie ist
+        | zugleich der schwaechste Punkt der Kette (fuer sie gilt Brains
+        | MFA-Pflicht nicht) und gehoert deshalb kurz gehalten. Diese Konten
+        | brauchen hier ein starkes Passwort und eigenes MFA.
+        */
+        'local' => env('AI_BRAIN_LOCAL_LOGIN', 'an'),
+        'local_except' => env('AI_BRAIN_LOCAL_LOGIN_EXCEPT', ''),
     ],
 
     /*
