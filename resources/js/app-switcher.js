@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.4.1';
+    const VERSION = '1.5.0';
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -40,6 +40,7 @@
             this.apps = [];
             this.pins = [];
             this.offen = false;
+            this.bearbeitet = false;
             this.schliessUhr = null;
         }
 
@@ -420,7 +421,7 @@
                     return;
                 }
 
-                this.anpinnen();
+                this.benennen();
             });
 
             this.leiste.querySelectorAll('.loesen').forEach((knopf) => {
@@ -432,14 +433,72 @@
         }
 
         /**
+         * Vor dem Ablegen nach dem Namen fragen.
+         *
+         * Der Seitentitel allein reicht nicht: Zwei Postfaecher im selben
+         * System heissen beide „Emails" und unterscheiden sich nur in der
+         * Adresse — nebeneinander in der Leiste sind sie dann nicht
+         * auseinanderzuhalten. Welches welches ist, weiss nur der Mensch davor;
+         * keine Regel kann das erraten.
+         *
+         * Vorbelegt mit dem Titel, damit der Normalfall ein Klick und ein
+         * Enter bleibt.
+         */
+        benennen() {
+            const vorschlag = this.titelKuerzen(document.title || location.pathname).slice(0, 80);
+
+            this.leiste.querySelector('.anpinnen')?.remove();
+
+            const feld = document.createElement('input');
+            feld.className = 'eingabe';
+            feld.type = 'text';
+            feld.value = vorschlag;
+            feld.maxLength = 80;
+            feld.setAttribute('aria-label', 'Name des Merkzettels');
+            this.leiste.appendChild(feld);
+
+            // Solange getippt wird, darf die Leiste nicht zufahren — sonst ist
+            // die Eingabe weg, sobald die Maus danebengeraet.
+            this.bearbeitet = true;
+
+            feld.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.bearbeitet = false;
+                    this.anpinnen(feld.value.trim() || vorschlag);
+                }
+
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.abbrechen();
+                }
+            });
+
+            feld.addEventListener('blur', () => {
+                // Ein Klick daneben ist ein Abbruch, kein Verlust: Was
+                // getippt wurde, war noch nicht abgelegt.
+                if (this.bearbeitet) {
+                    this.abbrechen();
+                }
+            });
+
+            feld.focus();
+            feld.select();
+        }
+
+        abbrechen() {
+            this.bearbeitet = false;
+            this.zeichnen({ apps: this.apps, pins: this.pins });
+        }
+
+        /**
          * Die aktuelle Seite ablegen.
          *
          * Titel und Adresse kommen aus dem Dokument — niemand soll etwas
          * abtippen muessen. Der Server prueft trotzdem beides; er darf sich auf
          * nichts verlassen, was von hier kommt.
          */
-        async anpinnen() {
-            const label = this.titelKuerzen(document.title || location.pathname).slice(0, 80);
+        async anpinnen(label) {
 
             const neuerPin = await this.schicken('POST', {
                 url: location.href,
@@ -570,7 +629,7 @@
         zumachen() {
             clearTimeout(this.schliessUhr);
 
-            if (!this.offen) {
+            if (!this.offen || this.bearbeitet) {
                 return;
             }
 
@@ -903,6 +962,23 @@
     .anpinnen.ist-drin:focus-visible .plus { transform: rotate(45deg); }
 
     .plus { font-size: 16px; line-height: 1; }
+
+    /* Das Namensfeld steht an der Stelle des Plus — die Leiste waechst kurz,
+       statt ein Fenster aufzumachen. */
+    .eingabe {
+        width: 150px;
+        height: 38px;
+        padding: 0 10px;
+        border: 1px solid var(--gedaempft);
+        border-radius: 10px;
+        background: var(--grund);
+        color: var(--schrift);
+        font: inherit;
+        font-size: 12px;
+        outline: none;
+    }
+
+    .eingabe::placeholder { color: var(--gedaempft); }
 
 
     /* Der Name erscheint erst beim Zeigen — vier Beschriftungen nebeneinander
