@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.3.0';
+    const VERSION = '1.4.0';
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -359,37 +359,58 @@
             return wort.charAt(0).toUpperCase() + wort.slice(1);
         }
 
-        /**
-         * Laesst sich die Seite, auf der wir gerade stehen, anpinnen?
-         *
-         * Nein, wenn sie schon drin ist — sonst waere der Knopf eine Einladung
-         * zum Doppelten. Und nein, wenn gar keine Adresse zum Ablegen bekannt
-         * ist.
-         */
+        /** Gibt es ueberhaupt eine Stelle, an der abgelegt werden kann? */
         kannAnpinnen() {
-            if (!this.getAttribute('pin-endpoint')) {
-                return false;
-            }
-
-            return !this.pins.some((pin) => pin.url === location.href);
+            return Boolean(this.getAttribute('pin-endpoint'));
         }
 
+        /** Der Merkzettel zur Seite, auf der wir gerade stehen — oder null. */
+        hierAngepinnt() {
+            return this.pins.find((pin) => pin.url === location.href) ?? null;
+        }
+
+        /**
+         * Ein Umschalter, kein Knopf, der verschwindet.
+         *
+         * Vorher wurde er ausgeblendet, sobald die Seite schon angepinnt war.
+         * Das ist gemeldet worden als „ich kann nur einen hinzufuegen": Wer auf
+         * einer Seite steht, die schon drin ist, sieht keinen Knopf — und kann
+         * nicht wissen, ob die Funktion fehlt, kaputt ist oder ihre Arbeit
+         * bereits getan hat.
+         *
+         * Ein Zustand, den man sieht, ist besser als einer, den man aus einer
+         * Abwesenheit erschliessen muss. Zweiter Klick nimmt wieder heraus —
+         * dieselbe Geste wie beim Lesezeichen-Stern im Browser.
+         */
         anpinnKnopf() {
             if (!this.kannAnpinnen()) {
                 return '';
             }
 
+            const drin = this.hierAngepinnt();
+            const text = drin ? 'Diese Seite ist angepinnt — Klick nimmt sie heraus' : 'Diese Seite anpinnen';
+
             return `
-                <button class="anpinnen" type="button"
-                        aria-label="Diese Seite anpinnen">
-                    <span class="plus" aria-hidden="true">+</span>
-                    <span class="hinweis" role="tooltip">Diese Seite anpinnen</span>
+                <button class="anpinnen${drin ? ' ist-drin' : ''}" type="button"
+                        aria-pressed="${drin ? 'true' : 'false'}"
+                        aria-label="${this.sicher(text)}">
+                    <span class="plus" aria-hidden="true">${drin ? '&#10003;' : '+'}</span>
+                    <span class="hinweis" role="tooltip">${this.sicher(text)}</span>
                 </button>`;
         }
 
         knoepfeVerdrahten() {
             this.leiste.querySelector('.anpinnen')?.addEventListener('click', (e) => {
                 e.preventDefault();
+
+                const drin = this.hierAngepinnt();
+
+                if (drin) {
+                    this.loesen(drin.id);
+
+                    return;
+                }
+
                 this.anpinnen();
             });
 
@@ -863,6 +884,14 @@
 
     .anpinnen:hover,
     .anpinnen:focus-visible { color: var(--schrift); border-color: var(--gedaempft); }
+
+    /* Angepinnt: durchgezogen statt gestrichelt — der Zustand ist zu sehen,
+       nicht aus einer Abwesenheit zu erschliessen. */
+    .anpinnen.ist-drin {
+        border-style: solid;
+        border-color: var(--gedaempft);
+        color: var(--schrift);
+    }
 
     .plus { font-size: 16px; line-height: 1; }
 
