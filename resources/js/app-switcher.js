@@ -13,7 +13,7 @@
  *
  * EINBINDEN:
  *
- *     <script src="/switcher/app-switcher.js?v=11" defer></script>
+ *     <script src="/switcher/app-switcher.js?v=12" defer></script>
  *     <peppermint-app-switcher endpoint="/switcher/apps" aktuell="ai-brain">
  *     </peppermint-app-switcher>
  *
@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.2.1';
+    const VERSION = '1.2.2';
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -334,7 +334,27 @@
                 }
             }
 
+            // Heisst die Seite wie das System selbst („Peppermint Manager"),
+            // sagt der Merkzettel nichts — er sieht dann aus wie die Kachel
+            // daneben. Dann lieber der Weg: /projekte/17 wird zu „Projekte".
+            if (text === '' || text === name) {
+                text = this.ausDemWeg();
+            }
+
             return text !== '' ? text : (titel ?? '').trim();
+        }
+
+        /** Der erste sprechende Teil der Adresse, gross geschrieben. */
+        ausDemWeg() {
+            const teile = location.pathname.split('/').filter((t) => t !== '' && !/^\d+$/.test(t));
+
+            if (teile.length === 0) {
+                return 'Startseite';
+            }
+
+            const wort = decodeURIComponent(teile[0]).replace(/[-_]+/g, ' ');
+
+            return wort.charAt(0).toUpperCase() + wort.slice(1);
         }
 
         /**
