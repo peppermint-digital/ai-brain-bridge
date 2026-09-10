@@ -2,6 +2,7 @@
 
 namespace Peppermint\AiBrainBridge\Http\Controllers;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -99,12 +100,21 @@ class SwitcherController
             return response()->json(['apps' => []]);
         }
 
-        $schluessel = 'ai-brain-switcher:'.$user->getAuthIdentifier();
         $dauer = (int) config('ai-brain-bridge.switcher.cache_seconds', 300);
 
-        $apps = Cache::remember($schluessel, $dauer, fn (): array => $this->holen());
+        $apps = Cache::remember($this->schluessel($user), $dauer, fn (): array => $this->holen());
 
         return response()->json(['apps' => $apps]);
+    }
+
+    /**
+     * Ein Zwischenspeicher-Schluessel je Person — an EINER Stelle, weil ihn
+     * zwei Wege lesen: der Endpunkt (der auch fuellt) und das Layout (das nur
+     * liest).
+     */
+    protected function schluessel(Authenticatable $user): string
+    {
+        return 'ai-brain-switcher:'.$user->getAuthIdentifier();
     }
 
     /**
@@ -156,7 +166,9 @@ class SwitcherController
             return '';
         }
 
-        if (! Auth::guard((string) config('ai-brain-bridge.login.guard', 'web'))->check()) {
+        $user = Auth::guard((string) config('ai-brain-bridge.login.guard', 'web'))->user();
+
+        if ($user === null) {
             return '';
         }
 
@@ -165,14 +177,25 @@ class SwitcherController
         $slug = e((string) (BridgeConfig::load()['source']
             ?? config('ai-brain-bridge.source')));
 
-        // Die Liste MITGEBEN statt nachladen lassen: Sie steht ohnehin im
-        // Zwischenspeicher, und so ist die Leiste beim Ankommen sofort
-        // vollstaendig, statt nachzupoppen. `endpoint` bleibt als Rueckfall.
-        $liste = e((string) json_encode($this->apps(request())->getData(true)['apps'] ?? []));
+        // Die Liste mitgeben, WENN sie schon dasteht — aber niemals dafuer
+        // losziehen.
+        //
+        // Hier laeuft das Rendern einer Seite. Ein Aufruf zu AI Brain an dieser
+        // Stelle macht JEDE Seite dieses Produkts davon abhaengig, dass der Hub
+        // schnell antwortet — und beim ersten Aufruf nach Ablauf des
+        // Zwischenspeichers wartet ein Mensch darauf, obwohl er die Leiste
+        // vielleicht gar nicht benutzt. Genau das war der Fehler, den ein
+        // Nutzer als „jetzt dauert es laenger" gemeldet hat.
+        //
+        // Steht nichts bereit, faellt das Attribut weg und die Leiste holt die
+        // Liste nach dem Laden ueber `endpoint`. Das kostet ein Nachpoppen —
+        // aber nur beim ersten Mal, und es haelt die Seite frei.
+        $bereit = Cache::get($this->schluessel($user));
+        $liste = is_array($bereit) ? ' apps="'.e((string) json_encode($bereit)).'"' : '';
 
         return <<<HTML
             <script src="{$script}" defer></script>
-            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}" apps="{$liste}"></peppermint-app-switcher>
+            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}"{$liste}></peppermint-app-switcher>
             HTML;
     }
 

@@ -139,7 +139,7 @@ it('schreibt mit Anmeldung Skript und Element ins Layout', function () {
         ->and($markup)->toContain('endpoint=');
 });
 
-it('gibt die Liste im Layout mit, statt sie nachladen zu lassen', function () {
+it('gibt die Liste im Layout mit, wenn sie schon bereitsteht', function () {
     // Sonst poppt die Leiste beim Ankommen nach — genau in dem Moment, in dem
     // jemand gerade das System gewechselt hat und hinsieht.
     Http::fake([
@@ -153,8 +153,33 @@ it('gibt die Liste im Layout mit, statt sie nachladen zu lassen', function () {
 
     $this->actingAs($this->person);
 
+    // Der Endpunkt fuellt den Zwischenspeicher — das ist der Weg, auf dem die
+    // Liste hierher kommt.
+    $this->getJson('/ai-brain/switcher/apps')->assertOk();
+
     $markup = app(SwitcherController::class)->markup();
 
     expect($markup)->toContain('apps=')
         ->and($markup)->toContain('peppermint-crm');
+});
+
+it('zieht beim Rendern einer Seite NIEMALS zu AI Brain los', function () {
+    // Der Fehler, den ein Nutzer als „jetzt dauert es laenger" gemeldet hat:
+    // Ein Aufruf zum Hub an dieser Stelle macht JEDE Seite dieses Produkts
+    // davon abhaengig, dass Brain schnell antwortet — und beim ersten Aufruf
+    // nach Ablauf des Zwischenspeichers wartet ein Mensch darauf, obwohl er
+    // die Leiste vielleicht gar nicht benutzt.
+    Http::fake(['*' => Http::response([], 500)]);
+
+    Cache::flush();
+    $this->actingAs($this->person);
+
+    $markup = app(SwitcherController::class)->markup();
+
+    Http::assertNothingSent();
+
+    // Ohne bereitstehende Liste faellt das Attribut weg — die Leiste holt sie
+    // nach dem Laden selbst.
+    expect($markup)->toContain('peppermint-app-switcher')
+        ->and($markup)->not->toContain('apps=');
 });
