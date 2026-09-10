@@ -138,6 +138,51 @@ Solange das alte Paket installiert ist, **tritt dieses hier zurück** und meldet
 nichts. So kann jedes Produkt zu seinem eigenen Deploy umsteigen, ohne dass die
 Meldung zwischenzeitlich doppelt läuft.
 
+## Umschaltleiste zwischen den Systemen
+
+Ein Griff am oberen Bildschirmrand: Maus dagegen, und die Systeme fahren aus, in
+die sich diese Person anmelden darf. Wer dort steht, entscheidet ausschliesslich
+das Verzeichnis in AI Brain — dieses Produkt fragt nur.
+
+```env
+AI_BRAIN_SWITCHER=true
+```
+
+Eine Zeile im Layout (`resources/views/app.blade.php`), vor `</body>`:
+
+```blade
+@aiBrainSwitcher
+```
+
+Das war alles. Die Leiste selbst liefert das Paket aus; sie laeuft in Vue-, React-
+und Blade-Anwendungen gleich, weil sie ein Web-Component in reinem JavaScript ist.
+
+**Sie haengt an zwei Schaltern.** Ohne `AI_BRAIN_LOGIN` bleibt sie weg — ein Knopf,
+der in ein System fuehrt, in dem der gemeinsame Anmeldeweg fehlt, endet auf einer
+Anmeldemaske. Genau das soll sie ersparen.
+
+**Was beim Klick passiert.** Der Knopf zeigt auf `/auth/brain/go` des Ziels:
+Sitzung vorhanden → sofort weiter, sonst → durch den Anmeldeweg. Wohin es geht,
+bestimmt das Zielprodukt ueber `AI_BRAIN_LOGIN_AFTER` — nicht AI Brain.
+
+**Wenn AI Brain ausfaellt**, erscheint keine Leiste. Sie ist Beiwerk und darf nie
+der Grund sein, dass eine Seite nicht laedt.
+
+### Landet man auf der richtigen Seite?
+
+Zeigt `/` im Produkt eine Willkommensseite, landet man beim Umschalten dort —
+und muss ein zweites Mal klicken. Angemeldete gehoeren aufs Dashboard:
+
+```php
+Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+
+    return redirect()->route('login');
+})->name('home');
+```
+
 ## Status
 v0.1.
 

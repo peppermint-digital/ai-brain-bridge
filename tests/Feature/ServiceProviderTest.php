@@ -19,3 +19,10 @@ it('merges config with sensible defaults', function () {
     expect(config('ai-brain-bridge.oauth.scope'))->toBe('mcp:use')
         ->and(config('ai-brain-bridge.inbound.route'))->toBe('/webhooks/ai-brain');
 });
+
+it('legt ohne Freischaltung keine Umschaltleiste an', function () {
+    // Ein Produkt, das nichts einschaltet, bekommt auch nichts — weder eine
+    // Route noch eine Anfrage an AI Brain (AI Brain #5281).
+    expect(Route::has('ai-brain-bridge.switcher.go'))->toBeFalse()
+        ->and(Route::has('ai-brain-bridge.switcher.apps'))->toBeFalse();
+});

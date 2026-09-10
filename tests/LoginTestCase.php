@@ -18,5 +18,10 @@ abstract class LoginTestCase extends TestCase
         $app['config']->set('ai-brain-bridge.login.client_secret', 'geheim');
         $app['config']->set('ai-brain-bridge.login.after_login', '/dashboard');
         $app['config']->set('auth.providers.users.model', \LoginTestUser::class);
+
+        // Die Umschaltleiste haengt am selben Boot-Zeitpunkt (AI Brain #5281).
+        $app['config']->set('ai-brain-bridge.switcher.enabled', true);
+        $app['config']->set('ai-brain-bridge.oauth.client_id', 'maschinen-client');
+        $app['config']->set('ai-brain-bridge.oauth.client_secret', 'maschinen-geheimnis');
     }
 }

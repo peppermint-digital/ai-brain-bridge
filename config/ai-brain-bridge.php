@@ -84,6 +84,32 @@ return [
     ],
 
     /*
+    | Umschaltleiste zwischen den Peppermint-Systemen (AI Brain #5281).
+    |
+    | Ein Griff am oberen Bildschirmrand, hinter dem die Systeme liegen, in die
+    | sich diese Person anmelden darf. Was dort steht, entscheidet ausschliesslich
+    | das Verzeichnis in AI Brain — dieses Produkt fragt nur.
+    |
+    | AUS als Vorgabe: Solange nichts eingeschaltet ist, registriert das Paket
+    | die Routen gar nicht, und im Produkt aendert sich nichts.
+    |
+    | Ohne `login.enabled` bleibt die Leiste ebenfalls weg — ein Knopf, der in
+    | ein System fuehrt, in dem der gemeinsame Anmeldeweg fehlt, endet auf der
+    | Anmeldemaske. Das ist genau der Weg, den sie ersparen soll.
+    */
+    'switcher' => [
+        'enabled' => filter_var(env('AI_BRAIN_SWITCHER', false), FILTER_VALIDATE_BOOL),
+        // Wie lange die Liste je Person zwischengespeichert wird. Sie aendert
+        // sich im Monat vielleicht einmal, die Seite laedt aber staendig.
+        'cache_seconds' => (int) env('AI_BRAIN_SWITCHER_CACHE', 300),
+        'timeout' => (int) env('AI_BRAIN_SWITCHER_TIMEOUT', 8),
+        'apps_path' => env('AI_BRAIN_SWITCHER_APPS', '/ai-brain/switcher/apps'),
+        'script_path' => env('AI_BRAIN_SWITCHER_SCRIPT', '/ai-brain/switcher/app-switcher.js'),
+        'go_path' => env('AI_BRAIN_SWITCHER_GO', '/auth/brain/go'),
+        'middleware' => ['web'],
+    ],
+
+    /*
     | MCP — synchrone Daten/Aktionen (Schiene 1).
     */
     'mcp' => [

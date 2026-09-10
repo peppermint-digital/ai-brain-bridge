@@ -2,12 +2,33 @@
 
 namespace Peppermint\AiBrainBridge;
 
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
+use Peppermint\AiBrainBridge\Config\BridgeConfig;
+use Peppermint\AiBrainBridge\Console\ConnectCommand;
+use Peppermint\AiBrainBridge\Console\PushHealthCommand;
+use Peppermint\AiBrainBridge\Console\SelftestCommand;
 use Peppermint\AiBrainBridge\Events\EventPublisher;
+use Peppermint\AiBrainBridge\Health\ExceptionRecorder;
+use Peppermint\AiBrainBridge\Health\HealthReporting;
+use Peppermint\AiBrainBridge\Health\SlowQueryRecorder;
+use Peppermint\AiBrainBridge\Http\Controllers\BrainLoginController;
+use Peppermint\AiBrainBridge\Http\Controllers\ConnectController;
 use Peppermint\AiBrainBridge\Http\Controllers\InboundEventController;
+use Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController;
+use Peppermint\AiBrainBridge\Http\Controllers\SwitcherController;
+use Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser;
+use Peppermint\AiBrainBridge\Http\Middleware\ResolvePeerActingUser;
 use Peppermint\AiBrainBridge\Http\Middleware\VerifyAiBrainSignature;
+use Peppermint\AiBrainBridge\Http\Middleware\VerifyPeerToken;
+use Peppermint\AiBrainBridge\Peer\DefaultPeerTokenIssuer;
+use Peppermint\AiBrainBridge\Peer\PeerTokenIssuer;
 
 class AiBrainBridgeServiceProvider extends ServiceProvider
 {
@@ -17,13 +38,13 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
 
         // One-Click-Anbindung: gespeichertes Bundle über die ENV-Defaults legen,
         // BEVOR die Singletons die Config lesen (Spec #249, Phase 1).
-        \Peppermint\AiBrainBridge\Config\BridgeConfig::apply();
+        BridgeConfig::apply();
 
         // Peer-Token-Aussteller (Phase 3b) — Default = SDK-Token. Ein Produkt
         // überschreibt dieses Binding mit einem nativen api.token-Issuer.
         $this->app->bind(
-            \Peppermint\AiBrainBridge\Peer\PeerTokenIssuer::class,
-            \Peppermint\AiBrainBridge\Peer\DefaultPeerTokenIssuer::class,
+            PeerTokenIssuer::class,
+            DefaultPeerTokenIssuer::class,
         );
 
         $this->app->singleton(OAuthTokenProvider::class, fn () => new OAuthTokenProvider(
@@ -57,29 +78,30 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         // Middleware-Alias, mit dem ein Produkt eigene Endpoints für Peers öffnet.
-        $this->app['router']->aliasMiddleware('peer.auth', \Peppermint\AiBrainBridge\Http\Middleware\VerifyPeerToken::class);
+        $this->app['router']->aliasMiddleware('peer.auth', VerifyPeerToken::class);
 
         // Eingehende Acting-User-Delegation (#471): hinter die MCP-Auth des
         // Produkts hängen, dann handelt der MCP-Aufruf als der Mensch, der die
         // Nachricht geschrieben hat — statt als Token-Besitzer.
-        $this->app['router']->aliasMiddleware('ai-brain.acting-user', \Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser::class);
+        $this->app['router']->aliasMiddleware('ai-brain.acting-user', ResolveAiBrainActingUser::class);
 
         // Dasselbe zwischen zwei Produkten (#3459): hinter die API-Auth hängen,
         // dann trägt ein Peer-Aufruf den Menschen, der ihn ausgelöst hat, statt
         // gar niemanden. Persönliche Tokens bleiben unberührt.
-        $this->app['router']->aliasMiddleware('peer.acting-user', \Peppermint\AiBrainBridge\Http\Middleware\ResolvePeerActingUser::class);
+        $this->app['router']->aliasMiddleware('peer.acting-user', ResolvePeerActingUser::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
-                \Peppermint\AiBrainBridge\Console\SelftestCommand::class,
-                \Peppermint\AiBrainBridge\Console\ConnectCommand::class,
-                \Peppermint\AiBrainBridge\Console\PushHealthCommand::class,
+                SelftestCommand::class,
+                ConnectCommand::class,
+                PushHealthCommand::class,
             ]);
         }
 
         $this->registerInboundRoute();
         $this->registerConnectRoute();
         $this->registerLoginRoutes();
+        $this->registerSwitcherRoutes();
         $this->registerPeerRoutes();
         $this->registerHealthReporting();
     }
@@ -101,31 +123,31 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
      */
     protected function registerHealthReporting(): void
     {
-        if (! \Peppermint\AiBrainBridge\Health\HealthReporting::aktiv()) {
+        if (! HealthReporting::aktiv()) {
             return;
         }
 
-        $this->app->singleton(\Peppermint\AiBrainBridge\Health\ExceptionRecorder::class);
-        $this->app->singleton(\Peppermint\AiBrainBridge\Health\SlowQueryRecorder::class);
+        $this->app->singleton(ExceptionRecorder::class);
+        $this->app->singleton(SlowQueryRecorder::class);
 
         // Bewusst auch in der Konsole: Queue-Worker sind der Ort, an dem die
         // interessanten Fehler passieren.
         if (config('ai-brain-bridge.health.exceptions.enabled', true)) {
-            \Illuminate\Support\Facades\Event::listen(
-                \Illuminate\Log\Events\MessageLogged::class,
-                fn ($event) => $this->app->make(\Peppermint\AiBrainBridge\Health\ExceptionRecorder::class)->record($event),
+            Event::listen(
+                MessageLogged::class,
+                fn ($event) => $this->app->make(ExceptionRecorder::class)->record($event),
             );
         }
 
         if (config('ai-brain-bridge.health.slow_queries.enabled', true)) {
-            \Illuminate\Support\Facades\Event::listen(
-                \Illuminate\Database\Events\QueryExecuted::class,
-                fn ($event) => $this->app->make(\Peppermint\AiBrainBridge\Health\SlowQueryRecorder::class)->record($event),
+            Event::listen(
+                QueryExecuted::class,
+                fn ($event) => $this->app->make(SlowQueryRecorder::class)->record($event),
             );
         }
 
         $this->app->booted(function (): void {
-            $schedule = $this->app->make(\Illuminate\Console\Scheduling\Schedule::class);
+            $schedule = $this->app->make(Schedule::class);
             $event = $schedule->command('ai-brain:push-health')->withoutOverlapping();
 
             $takt = (string) config('ai-brain-bridge.health.schedule', 'everyFiveMinutes');
@@ -150,7 +172,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         Route::middleware((array) config('ai-brain-bridge.peer.claim_middleware', ['api', 'throttle:20,1']))
             ->post(
                 (string) config('ai-brain-bridge.peer.claim_route', '/api/v1/connect/claim'),
-                [\Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController::class, 'claim'],
+                [PeerConnectController::class, 'claim'],
             )
             ->name('peer.connect.claim');
 
@@ -160,7 +182,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         Route::middleware(['api', 'peer.auth', 'throttle:20,1'])
             ->post(
                 '/api/v1/peer/acting-secret',
-                [\Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController::class, 'actingSecret'],
+                [PeerConnectController::class, 'actingSecret'],
             )
             ->name('peer.acting-secret');
     }
@@ -177,7 +199,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
 
         $route = (string) config('ai-brain-bridge.connect.route', '/ai-brain/connect');
         $middleware = (array) config('ai-brain-bridge.connect.middleware', ['web']);
-        $controller = \Peppermint\AiBrainBridge\Http\Controllers\ConnectController::class;
+        $controller = ConnectController::class;
 
         Route::middleware($middleware)->group(function () use ($route, $controller) {
             Route::get($route, [$controller, 'status'])->name('ai-brain-bridge.connect.status');
@@ -196,7 +218,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             return;
         }
 
-        $controller = \Peppermint\AiBrainBridge\Http\Controllers\BrainLoginController::class;
+        $controller = BrainLoginController::class;
         $middleware = (array) config('ai-brain-bridge.login.middleware', ['web']);
 
         Route::middleware($middleware)->group(function () use ($controller): void {
@@ -210,6 +232,57 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
                 [$controller, 'callback'],
             )->name('ai-brain-bridge.login.callback');
         });
+    }
+
+    /**
+     * Umschaltleiste zwischen den Peppermint-Systemen (AI Brain #5281).
+     *
+     * Haengt an ZWEI Schaltern: an ihrem eigenen und am gemeinsamen Anmeldeweg.
+     * Ohne den zweiten fuehrt jeder Knopf, dessen Ziel keine Sitzung hat, auf
+     * eine Anmeldemaske — also genau dorthin, wo die Leiste hinwegfuehren soll.
+     */
+    protected function registerSwitcherRoutes(): void
+    {
+        if (! config('ai-brain-bridge.switcher.enabled') || ! config('ai-brain-bridge.login.enabled')) {
+            return;
+        }
+
+        $controller = SwitcherController::class;
+        $middleware = (array) config('ai-brain-bridge.switcher.middleware', ['web']);
+
+        Route::middleware($middleware)->group(function () use ($controller): void {
+            Route::get(
+                (string) config('ai-brain-bridge.switcher.go_path', '/auth/brain/go'),
+                [$controller, 'go'],
+            )->name('ai-brain-bridge.switcher.go');
+
+            Route::get(
+                (string) config('ai-brain-bridge.switcher.apps_path', '/ai-brain/switcher/apps'),
+                [$controller, 'apps'],
+            )->name('ai-brain-bridge.switcher.apps');
+
+            Route::get(
+                (string) config('ai-brain-bridge.switcher.script_path', '/ai-brain/switcher/app-switcher.js'),
+                [$controller, 'script'],
+            )->name('ai-brain-bridge.switcher.script');
+        });
+
+        $this->registerSwitcherDirective();
+    }
+
+    /**
+     * `@aiBrainSwitcher` — eine Zeile im Layout des Produkts.
+     *
+     * Bewusst eine Blade-Direktive und kein Vue-/React-Bauteil: Der Manager
+     * laeuft auf Vue, CRM und Verwaltung auf React. Im Layout haengt sie in
+     * allen dreien gleich.
+     */
+    protected function registerSwitcherDirective(): void
+    {
+        Blade::directive(
+            'aiBrainSwitcher',
+            fn (): string => "<?php echo app('".SwitcherController::class."')->markup(); ?>",
+        );
     }
 
     protected function registerInboundRoute(): void
