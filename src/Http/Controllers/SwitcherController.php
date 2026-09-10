@@ -212,7 +212,9 @@ class SwitcherController
             return '';
         }
 
-        $script = e(route('ai-brain-bridge.switcher.script'));
+        // Marke, die sich mit der Datei aendert — sonst bleibt eine Stunde
+        // lang (`max-age`) die alte Fassung im Browser.
+        $script = e(route('ai-brain-bridge.switcher.script').'?v='.$this->fassung());
         $endpunkt = e(route('ai-brain-bridge.switcher.apps'));
         $pins = e(route('ai-brain-bridge.switcher.pins'));
         $slug = e((string) (BridgeConfig::load()['source']
@@ -248,9 +250,28 @@ class SwitcherController
      * niemand merkt es. So traegt jedes Produkt automatisch die Fassung, die
      * seine Paketversion mitbringt.
      */
+    protected function datei(): string
+    {
+        return __DIR__.'/../../../resources/js/app-switcher.js';
+    }
+
+    /**
+     * Eine Marke, die sich mit der Datei aendert.
+     *
+     * Ohne sie bleibt eine Stunde lang (`max-age`) die alte Fassung im Browser
+     * — jede Aenderung waere so lange unsichtbar, und zwar ausgerechnet fuer
+     * die Leute, die gerade zugesehen haben.
+     */
+    protected function fassung(): string
+    {
+        $datei = $this->datei();
+
+        return is_file($datei) ? (string) filemtime($datei) : 'fehlt';
+    }
+
     public function script(): Response
     {
-        $datei = __DIR__.'/../../../resources/js/app-switcher.js';
+        $datei = $this->datei();
 
         return response()->file($datei, [
             'Content-Type' => 'application/javascript; charset=utf-8',
