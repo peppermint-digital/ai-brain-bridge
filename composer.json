@@ -3,7 +3,13 @@
     "description": "Einheitlicher Kommunikationslayer (MCP + Events) zwischen Peppermint-Produkten und AI Brain.",
     "type": "library",
     "license": "proprietary",
-    "keywords": ["peppermint", "ai-brain", "mcp", "events", "integration"],
+    "keywords": [
+        "peppermint",
+        "ai-brain",
+        "mcp",
+        "events",
+        "integration"
+    ],
     "require": {
         "php": "^8.3",
         "guzzlehttp/guzzle": "^7.8",
@@ -43,5 +49,9 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "suggest": {
+        "laravel/mcp": "Wird gebraucht, wenn das Produkt das mitgelieferte ListRolesTool an seinem MCP-Server registriert (AI Brain #5245).",
+        "spatie/laravel-permission": "Ohne eigenen Resolver liest der RoleCatalog die Rollen von dort."
+    }
 }
