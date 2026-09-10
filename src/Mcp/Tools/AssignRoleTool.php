@@ -3,6 +3,7 @@
 namespace Peppermint\AiBrainBridge\Mcp\Tools;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -51,6 +52,29 @@ class AssignRoleTool extends Tool
 
         if ($veranlasstVon === '') {
             return Response::error('Ohne `veranlasst_von` wird keine Rolle geändert. Eine Zugangsentscheidung ohne Namen ist im Nachhinein nicht mehr zuzuordnen.');
+        }
+
+        // Handelt hier ein MENSCH (Acting-User-Delegation aus einem Channel),
+        // muss er es auch dürfen. Ohne diese Prüfung könnte jeder, der einen
+        // Channel bedienen darf, sich selbst zum Administrator machen — die
+        // Riegel weiter unten schützen das Produkt vor Unsinn, nicht vor
+        // Absicht.
+        //
+        // Ohne handelnden Nutzer entscheidet der Maschinen-Token. Das ist
+        // dieselbe Linie, die die schreibenden Werkzeuge der Verwaltung seit
+        // jeher ziehen (`AuthorizesMcpActions`): Der Token IST die
+        // Vertrauensgrenze, und der Aufrufer hat auf seiner Seite bereits
+        // geprüft, wer fragen darf.
+        $handelnder = $request->user();
+
+        if ($handelnder !== null && Gate::forUser($handelnder)->denies('ai-brain.assign-roles')) {
+            Log::warning('Rollenänderung abgewiesen: handelnde Person darf das nicht', [
+                'handelnder' => $handelnder->email ?? null,
+                'email' => $email,
+                'rolle' => $rolle,
+            ]);
+
+            return Response::error('🔒 Nicht ausgeführt: Diese Person darf in diesem System keine Rollen vergeben. Sag das dem Nutzer, statt es auf einem anderen Weg zu versuchen.');
         }
 
         $ergebnis = RoleAssignment::setzen($email, $rolle, $modus);

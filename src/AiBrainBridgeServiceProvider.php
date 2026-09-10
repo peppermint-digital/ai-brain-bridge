@@ -2,6 +2,9 @@
 
 namespace Peppermint\AiBrainBridge;
 
+use Illuminate\Support\Facades\Gate;
+use Peppermint\AiBrainBridge\Auth\RoleAssignment;
+
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Log\Events\MessageLogged;
@@ -78,6 +81,27 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
 
         // Peer-to-Peer-Tabellen (Phase 3) — additiv, im Produkt.
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        // Wer darf aus AI Brain heraus Rollen setzen? (#5314)
+        //
+        // Die Vorgabe: wer selbst eine der geschuetzten Rollen traegt — also
+        // die, die nie leer werden duerfen. Das ist keine Willkuer: Genau diese
+        // Rollen tragen die Schluessel, und wer Rollen vergeben darf, kann sich
+        // jede andere ohnehin selbst geben.
+        //
+        // `Gate::has` davor, damit ein Produkt es UEBERSTEUERN kann, indem es
+        // die Faehigkeit vorher selbst definiert. Ein Paket, das die
+        // Entscheidung des Produkts ueberschreibt, waere an dieser Stelle das
+        // Gegenteil dessen, was es sein soll.
+        if (! Gate::has('ai-brain.assign-roles')) {
+            Gate::define('ai-brain.assign-roles', function ($user): bool {
+                if (! method_exists($user, 'hasAnyRole')) {
+                    return false;
+                }
+
+                return $user->hasAnyRole(RoleAssignment::geschuetzte());
+            });
+        }
 
         // Middleware-Alias, mit dem ein Produkt eigene Endpoints für Peers öffnet.
         $this->app['router']->aliasMiddleware('peer.auth', VerifyPeerToken::class);
