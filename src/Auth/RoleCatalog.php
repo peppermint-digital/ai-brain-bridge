@@ -93,7 +93,13 @@ class RoleCatalog
 
         return $klasse::query()
             ->with('permissions:id,name')
-            ->withCount('users')
+            // OHNE die globalen Filter des Nutzer-Modells zaehlen. Wer eine
+            // Rolle traegt, ist eine andere Frage als wer in Auswahllisten
+            // erscheinen soll: Der Manager blendet Dienst-Konten (z. B. die
+            // Buchhaltung) ueberall aus — und meldete damit „0 Traeger" fuer
+            // eine Rolle, die jemand hat. Eine Null, die „niemand" behauptet,
+            // waere schlimmer als gar keine Zahl (AI Brain #5245).
+            ->withCount(['users' => fn ($abfrage) => $abfrage->withoutGlobalScopes()])
             ->orderBy('name')
             ->get()
             ->map(fn ($rolle) => [
