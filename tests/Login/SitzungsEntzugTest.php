@@ -1,6 +1,9 @@
 <?php
 
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Peppermint\AiBrainBridge\Auth\BrainLogin;
 use Peppermint\AiBrainBridge\Auth\SitzungenBeenden;
@@ -113,3 +116,47 @@ it('haengt am Ereignis-Empfang, nicht an einem Schalter', function () {
 
     expect(DB::table('sessions')->where('user_id', $this->person->id)->count())->toBe(0);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Einmal abmelden, ueberall abgemeldet (AI Brain #5344)
+|--------------------------------------------------------------------------
+*/
+
+it('beendet die Sitzungen auch bei einer weitergereichten Abmeldung', function () {
+    $abmeldung = new AiBrainEventReceived(Event::fromArray([
+        'id' => 'evt_3',
+        'type' => 'user.logged_out',
+        'source' => 'ai-brain',
+        'occurred_at' => now()->toIso8601String(),
+        'idempotency_key' => 'evt_3',
+        'payload' => ['email' => 'chris@example.test', 'grund' => 'Abmeldung'],
+    ]));
+
+    app(SitzungenBeenden::class)->handle($abmeldung);
+
+    expect(DB::table('sessions')->where('user_id', $this->person->id)->count())->toBe(0)
+        ->and(DB::table('sessions')->where('user_id', $this->andere->id)->count())->toBe(1);
+});
+
+it('reicht die eigene Abmeldung an AI Brain weiter', function () {
+    Http::fake([
+        'brain.test/oauth/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
+        '*' => Http::response(['ok' => true]),
+    ]);
+
+    event(new Logout('web', $this->person));
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/api/v1/users/me/logout-everywhere'));
+});
+
+it('laesst die Abmeldung durchgehen, wenn AI Brain schweigt', function () {
+    // DIE ZUSAGE: Wer auf „Abmelden" klickt, ist danach abgemeldet. Lokal gilt
+    // das auch dann, wenn der Hub nicht antwortet — sonst haenge die Abmeldung
+    // an der Erreichbarkeit eines anderen Servers.
+    Http::fake(function () {
+        throw new ConnectionException('Zeitüberschreitung');
+    });
+
+    event(new Logout('web', $this->person));
+})->throwsNoExceptions();

@@ -35,12 +35,22 @@ use Peppermint\AiBrainBridge\Events\AiBrainEventReceived;
  */
 class SitzungenBeenden
 {
-    /** Das Ereignis, das AI Brain schickt. */
+    /** Der Zugang wurde entzogen — diese Person darf hier nicht mehr herein. */
     public const EREIGNIS = 'user.access.revoked';
+
+    /**
+     * Die Person hat sich abgemeldet (AI Brain #5344). Sie darf weiterhin
+     * herein, nur nicht mehr mit dieser Sitzung.
+     *
+     * Zwei Typen mit derselben Wirkung, absichtlich: Ein Produkt, das eines
+     * Tages auf einen Entzug anders reagieren will als auf eine Abmeldung,
+     * kann sie unterscheiden.
+     */
+    public const ABMELDUNG = 'user.logged_out';
 
     public function handle(AiBrainEventReceived $event): void
     {
-        if ($event->event->type !== self::EREIGNIS) {
+        if (! in_array($event->event->type, [self::EREIGNIS, self::ABMELDUNG], true)) {
             return;
         }
 
@@ -61,17 +71,17 @@ class SitzungenBeenden
             return;
         }
 
-        $this->beenden($user, $email);
+        $this->beenden($user, $email, $event->event->type);
     }
 
-    protected function beenden(Authenticatable $user, string $email): void
+    protected function beenden(Authenticatable $user, string $email, string $typ): void
     {
         if (! Schema::hasTable('sessions')) {
             Log::warning(
                 'Zugangsentzug NICHT durchgesetzt: Sitzungen liegen nicht in der Datenbank. '
                 .'Mit SESSION_DRIVER=file oder cookie laesst sich eine fremde Sitzung nicht beenden — '
                 .'die Person bleibt bis zum Ablauf angemeldet.',
-                ['email' => $email]
+                ['email' => $email, 'typ' => $typ]
             );
 
             return;
@@ -79,7 +89,7 @@ class SitzungenBeenden
 
         $anzahl = DB::table('sessions')->where('user_id', $user->getAuthIdentifier())->delete();
 
-        Log::info('Zugangsentzug durchgesetzt', [
+        Log::info($typ === self::ABMELDUNG ? 'Abmeldung weitergereicht' : 'Zugangsentzug durchgesetzt', [
             'email' => $email,
             'beendete_sitzungen' => $anzahl,
         ]);

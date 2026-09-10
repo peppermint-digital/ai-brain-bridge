@@ -2,17 +2,18 @@
 
 namespace Peppermint\AiBrainBridge;
 
-use Illuminate\Support\Facades\Gate;
-use Peppermint\AiBrainBridge\Auth\RoleAssignment;
-
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Peppermint\AiBrainBridge\Auth\AbmeldungWeiterreichen;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
+use Peppermint\AiBrainBridge\Auth\RoleAssignment;
 use Peppermint\AiBrainBridge\Auth\SitzungenBeenden;
 use Peppermint\AiBrainBridge\Config\BridgeConfig;
 use Peppermint\AiBrainBridge\Console\ConnectCommand;
@@ -334,6 +335,15 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         Event::listen(
             AiBrainEventReceived::class,
             [SitzungenBeenden::class, 'handle'],
+        );
+
+        // Die Gegenrichtung (AI Brain #5344): Wer sich HIER abmeldet, ist auch
+        // in AI Brain und den uebrigen Systemen abgemeldet. Haengt am
+        // Anmelde-Schalter — ohne gemeinsamen Anmeldeweg gibt es nichts
+        // weiterzureichen.
+        Event::listen(
+            Logout::class,
+            [AbmeldungWeiterreichen::class, 'handle'],
         );
     }
 
