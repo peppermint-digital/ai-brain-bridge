@@ -76,6 +76,12 @@ class RoleCatalog
             'permissions' => array_values(array_map('strval', (array) ($rolle['permissions'] ?? []))),
             // Wie viele Menschen die Rolle tragen — die Zahl beantwortet
             // „wird das überhaupt benutzt", ohne dass jemand nachzählt.
+            //
+            // GEZÄHLT WIRD JEDER TRÄGER, auch wer keinen Zugang mehr hat: Eine
+            // Rolle zu tragen und sich anmelden zu dürfen sind zwei
+            // verschiedene Dinge, und das Verzeichnis beantwortet die zweite
+            // Frage bereits an anderer Stelle. Ein Produkt, das es anders
+            // zählt, macht die Spalte zwischen den Systemen unvergleichbar.
             'users' => isset($rolle['users']) ? (int) $rolle['users'] : null,
         ];
     }
