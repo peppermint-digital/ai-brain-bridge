@@ -24,7 +24,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.7.0';
+    const VERSION = '1.7.1';
 
     /**
      * Die Symbole, die ein Merkzettel tragen kann (#5320).
@@ -62,10 +62,43 @@
         euro: 'M17.5 6.5a7 7 0 1 0 0 11M4 10h9M4 14h9',
         diagramm: 'M4 20V10M10 20V4M16 20v-7M3 20h18',
         haken: 'M4 12.5l5 5L20 6.5',
-        zahnrad: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19',
+        regler: 'M4 8h7M15 8h5M4 16h5M13 16h7M13 5.5v5M9 13.5v5',
         buch: 'M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM17 7h2v13H8',
         paket: 'M12 3l8 4v10l-8 4-8-4V7zM4 7l8 4 8-4M12 11v10',
         gluehbirne: 'M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z',
+    };
+
+    /**
+     * Wie ein Symbol heisst, wenn ein Mensch danach fragt.
+     *
+     * Der Schluessel ist ein Bezeichner, kein Wort: „gluehbirne" als Kurzinfo
+     * und als Vorlesetext waere schlampig. Fehlt eine Bezeichnung, faellt es
+     * auf den Schluessel zurueck — dann steht dort etwas Unschoenes statt
+     * nichts.
+     */
+    const BEZEICHNUNG = {
+        mail: 'E-Mail',
+        kalender: 'Kalender',
+        datei: 'Datei',
+        ordner: 'Ordner',
+        person: 'Person',
+        gruppe: 'Gruppe',
+        haus: 'Startseite',
+        stern: 'Favorit',
+        herz: 'Gemerkt',
+        fahne: 'Markiert',
+        lupe: 'Suche',
+        uhr: 'Zeit',
+        chat: 'Nachrichten',
+        telefon: 'Telefon',
+        ort: 'Ort',
+        euro: 'Geld',
+        diagramm: 'Auswertung',
+        haken: 'Erledigt',
+        regler: 'Einstellungen',
+        buch: 'Wissen',
+        paket: 'Lieferung',
+        gluehbirne: 'Idee',
     };
 
     const SPEICHER = 'peppermint-switcher-apps';
@@ -649,8 +682,8 @@
                 return `<button class="symbolknopf${drin ? ' gewaehlt' : ''}" type="button"
                                 data-symbol="${this.sicher(schluessel)}"
                                 aria-pressed="${drin}"
-                                aria-label="${this.sicher(schluessel)}"
-                                title="${this.sicher(schluessel)}">${this.symbolBild(schluessel)}</button>`;
+                                aria-label="${this.sicher(BEZEICHNUNG[schluessel] || schluessel)}"
+                                title="${this.sicher(BEZEICHNUNG[schluessel] || schluessel)}">${this.symbolBild(schluessel)}</button>`;
             }).join('');
 
             return wahl;
