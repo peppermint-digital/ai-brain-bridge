@@ -14,7 +14,7 @@ abstract class TestCase extends Orchestra
 
     protected function getEnvironmentSetUp($app): void
     {
-        // In-Memory-DB für die Peer-Connector-Tabellen (Phase 3).
+        // In-Memory-DB fuer die Migrationen des Pakets.
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite',

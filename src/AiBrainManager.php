@@ -285,7 +285,6 @@ class AiBrainManager
      * Signatur für Aufrufe an ein anderes PRODUKT (Peer), nicht an AI Brain.
      *
      * Bewusst weiterhin das Altformat (nur E-Mail): Die Gegenseite prüft mit
-     * {@see \Peppermint\AiBrainBridge\Http\Middleware\ResolvePeerActingUser},
      * und die Produkte aktualisieren dieses Paket nicht gleichzeitig. Würde hier
      * kontextgebunden signiert, verwürfe jeder Peer mit älterem Paket den Header
      * — die Aufrufe liefen weiter (Peer-Delegation ist Zuschreibung, keine
@@ -298,34 +297,6 @@ class AiBrainManager
     public static function signPeerActingUser(string $email, string $secret): string
     {
         return 'sha256='.hash_hmac('sha256', $email, $secret);
-    }
-
-    /**
-     * Acting-User-Header für Peer-Aufrufe (Produkt → Produkt).
-     *
-     * @return array<string, string>
-     */
-    public function peerActingUserHeaders(?string $connectionSecret = null): array
-    {
-        if (($email = $this->actingUserEmail()) === null) {
-            return [];
-        }
-
-        $headers = [McpClient::ACTING_USER_HEADER => $email];
-
-        // Vorrang hat das Geheimnis der Peer-VERBINDUNG (#540). Das Event-Secret
-        // der Brain-Anbindung bleibt nur der Rückfallweg für Verbindungen, die
-        // noch keines haben — seit AI Brain es pro Produkt vergibt, teilen zwei
-        // Peers dort ohnehin nichts mehr.
-        $secret = ($connectionSecret !== null && $connectionSecret !== '')
-            ? $connectionSecret
-            : $this->actingSignatureSecret();
-
-        if ($secret !== null) {
-            $headers[McpClient::ACTING_SIG_HEADER] = self::signPeerActingUser($email, $secret);
-        }
-
-        return $headers;
     }
 
     /**

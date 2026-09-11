@@ -128,21 +128,6 @@ it('actingUserHeaders() signiert mit dem Event-Secret', function () {
     ]);
 });
 
-it('peerActingUserHeaders() bleibt beim Altformat (Peer-Zuschreibung)', function () {
-    // Produkt→Produkt prueft weiter E-Mail-only. Wuerde hier kontextgebunden
-    // signiert, verwuerfe jeder Peer mit aelterem Paket den Header und die
-    // Datensaetze verloeren ihren Urheber.
-    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
-    config()->set('ai-brain-bridge.source', 'mein-produkt');
-    app()->forgetInstance(\Peppermint\AiBrainBridge\AiBrainManager::class);
-    AiBrain::resolveActingUserUsing(fn () => 'martin@example.test');
-
-    expect(AiBrain::peerActingUserHeaders())->toBe([
-        McpClient::ACTING_USER_HEADER => 'martin@example.test',
-        McpClient::ACTING_SIG_HEADER => 'sha256='.hash_hmac('sha256', 'martin@example.test', 'shared-secret'),
-    ]);
-});
-
 it('actingUserHeaders() ist leer, wenn der Resolver null liefert (Hintergrund-Job)', function () {
     AiBrain::resolveActingUserUsing(fn () => null);
 

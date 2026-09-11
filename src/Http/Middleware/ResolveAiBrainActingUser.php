@@ -127,7 +127,8 @@ class ResolveAiBrainActingUser
     /**
      * Mit welchem Geheimnis wird die Behauptung geprüft? Für AI-Brain-Aufrufe ist
      * das die Anbindung selbst; die Peer-Variante überschreibt das mit dem
-     * Geheimnis der jeweiligen Verbindung ({@see ResolvePeerActingUser}).
+     * Geheimnis der jeweiligen Verbindung (bis #5400 ueber eine eigene
+     * Peer-Middleware, die es nicht mehr gibt).
      */
     protected function signingSecret(Request $request): ?string
     {

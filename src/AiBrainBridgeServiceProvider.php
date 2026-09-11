@@ -27,15 +27,10 @@ use Peppermint\AiBrainBridge\Health\SlowQueryRecorder;
 use Peppermint\AiBrainBridge\Http\Controllers\BrainLoginController;
 use Peppermint\AiBrainBridge\Http\Controllers\ConnectController;
 use Peppermint\AiBrainBridge\Http\Controllers\InboundEventController;
-use Peppermint\AiBrainBridge\Http\Controllers\PeerConnectController;
 use Peppermint\AiBrainBridge\Http\Controllers\SwitcherController;
 use Peppermint\AiBrainBridge\Http\Middleware\LokalerLoginRiegel;
 use Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser;
-use Peppermint\AiBrainBridge\Http\Middleware\ResolvePeerActingUser;
 use Peppermint\AiBrainBridge\Http\Middleware\VerifyAiBrainSignature;
-use Peppermint\AiBrainBridge\Http\Middleware\VerifyPeerToken;
-use Peppermint\AiBrainBridge\Peer\DefaultPeerTokenIssuer;
-use Peppermint\AiBrainBridge\Peer\PeerTokenIssuer;
 
 class AiBrainBridgeServiceProvider extends ServiceProvider
 {
@@ -47,12 +42,6 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         // BEVOR die Singletons die Config lesen (Spec #249, Phase 1).
         BridgeConfig::apply();
 
-        // Peer-Token-Aussteller (Phase 3b) — Default = SDK-Token. Ein Produkt
-        // überschreibt dieses Binding mit einem nativen api.token-Issuer.
-        $this->app->bind(
-            PeerTokenIssuer::class,
-            DefaultPeerTokenIssuer::class,
-        );
 
         $this->app->singleton(OAuthTokenProvider::class, fn () => new OAuthTokenProvider(
             array_merge(
@@ -81,7 +70,10 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             __DIR__.'/../config/ai-brain-bridge.php' => config_path('ai-brain-bridge.php'),
         ], 'ai-brain-bridge-config');
 
-        // Peer-to-Peer-Tabellen (Phase 3) — additiv, im Produkt.
+        // Die Migrationen des Pakets. Darunter die Peer-Tabellen: Sie bleiben
+        // vorerst, weil sie in zwoelf Anwendungen liegen — leere, ungenutzte
+        // Tabellen schaden nicht, ein Loeschen waere eine Schema-Aenderung
+        // ueberall (#5400).
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         // Wer darf aus AI Brain heraus Rollen setzen? (#5314)
@@ -105,18 +97,11 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             });
         }
 
-        // Middleware-Alias, mit dem ein Produkt eigene Endpoints für Peers öffnet.
-        $this->app['router']->aliasMiddleware('peer.auth', VerifyPeerToken::class);
 
         // Eingehende Acting-User-Delegation (#471): hinter die MCP-Auth des
         // Produkts hängen, dann handelt der MCP-Aufruf als der Mensch, der die
         // Nachricht geschrieben hat — statt als Token-Besitzer.
         $this->app['router']->aliasMiddleware('ai-brain.acting-user', ResolveAiBrainActingUser::class);
-
-        // Dasselbe zwischen zwei Produkten (#3459): hinter die API-Auth hängen,
-        // dann trägt ein Peer-Aufruf den Menschen, der ihn ausgelöst hat, statt
-        // gar niemanden. Persönliche Tokens bleiben unberührt.
-        $this->app['router']->aliasMiddleware('peer.acting-user', ResolvePeerActingUser::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -132,7 +117,6 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         $this->registerConnectRoute();
         $this->registerLoginRoutes();
         $this->registerSwitcherRoutes();
-        $this->registerPeerRoutes();
         $this->registerHealthReporting();
     }
 
@@ -184,37 +168,6 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
 
             method_exists($event, $takt) ? $event->{$takt}() : $event->everyFiveMinutes();
         });
-    }
-
-    /**
-     * Peer-to-Peer (Phase 3, Track B) — nur wenn das Produkt es aktiviert. Das SDK
-     * registriert AUSSCHLIESSLICH den öffentlichen claim-Endpoint (Code = Secret,
-     * gethrottelt, kein Auth). Die ADMIN-Aktionen (ausstellen/verbinden/widerrufen)
-     * baut jedes Produkt SELBST hinter seinem eigenen Admin-Gate — über den
-     * `PeerConnectionManager`-Service. So gibt es keinen unsicheren Default.
-     */
-    protected function registerPeerRoutes(): void
-    {
-        if (! config('ai-brain-bridge.peer.enabled')) {
-            return;
-        }
-
-        Route::middleware((array) config('ai-brain-bridge.peer.claim_middleware', ['api', 'throttle:20,1']))
-            ->post(
-                (string) config('ai-brain-bridge.peer.claim_route', '/api/v1/connect/claim'),
-                [PeerConnectController::class, 'claim'],
-            )
-            ->name('peer.connect.claim');
-
-        // Übergabe des Signatur-Geheimnisses für Verbindungen, die vor #540
-        // entstanden sind. Hinter `peer.auth` — der Peer-Token dieser Verbindung
-        // ist der Ausweis; ohne ihn kommt hier niemand an.
-        Route::middleware(['api', 'peer.auth', 'throttle:20,1'])
-            ->post(
-                '/api/v1/peer/acting-secret',
-                [PeerConnectController::class, 'actingSecret'],
-            )
-            ->name('peer.acting-secret');
     }
 
     /**
