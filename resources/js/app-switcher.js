@@ -1,11 +1,15 @@
 /**
  * Die Umschaltleiste zwischen den Peppermint-Systemen (AI Brain #5280).
  *
- * Bewusst ein Web-Component in reinem JavaScript und ohne Bauschritt: Der
- * Manager laeuft auf Vue, CRM, Verwaltung und Brain auf React. Als
- * React-Komponente muesste dieselbe Leiste fuer den Manager ein zweites Mal
- * gebaut werden — und zwei Fassungen driften auseinander, bis niemand mehr
- * sagen kann, welche die richtige ist.
+ * Bewusst ein Web-Component in reinem JavaScript und ohne Bauschritt: Die
+ * Leiste haengt in vier Anwendungen mit vier Bau-Ketten. Als React-Komponente
+ * muesste sie in jeder davon mitgebaut und mitversioniert werden; so ist sie
+ * EINE Datei, die ueberall dieselbe ist.
+ *
+ * (Urspruenglich kam die Bauform daher, dass der Manager auf Vue lief und die
+ * uebrigen auf React. Das ist seit dem 12.09.2026 nicht mehr so — die Flotte
+ * ist einheitlich React. Die Bauform bleibt aus dem Grund darueber; ein Umbau
+ * auf ein React-Bauteil waere moeglich, ist aber bewusst nicht gemacht.)
  *
  * Aus demselben Grund liegt das Aussehen im Shadow DOM: Die Leiste haengt in
  * vier Anwendungen mit vier CSS-Bestaenden. Was hier drin steht, kann von

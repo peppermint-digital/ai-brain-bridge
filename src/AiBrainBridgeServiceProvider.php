@@ -266,9 +266,9 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
     /**
      * `@aiBrainSwitcher` — eine Zeile im Layout des Produkts.
      *
-     * Bewusst eine Blade-Direktive und kein Vue-/React-Bauteil: Der Manager
-     * laeuft auf Vue, CRM und Verwaltung auf React. Im Layout haengt sie in
-     * allen dreien gleich.
+     * Bewusst eine Blade-Direktive und kein React-Bauteil: Die Leiste haengt
+     * im Layout mehrerer Anwendungen, und als Direktive ist das ueberall
+     * dieselbe eine Zeile — unabhaengig davon, was darunter rendert.
      */
     protected function registerSwitcherDirective(): void
     {

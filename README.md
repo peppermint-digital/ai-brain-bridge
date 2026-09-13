@@ -154,8 +154,9 @@ Eine Zeile im Layout (`resources/views/app.blade.php`), vor `</body>`:
 @aiBrainSwitcher
 ```
 
-Das war alles. Die Leiste selbst liefert das Paket aus; sie laeuft in Vue-, React-
-und Blade-Anwendungen gleich, weil sie ein Web-Component in reinem JavaScript ist.
+Das war alles. Die Leiste selbst liefert das Paket aus; sie laeuft in React- und
+Blade-Anwendungen gleich, weil sie ein Web-Component in reinem JavaScript ist —
+ohne Bauschritt in der einbindenden Anwendung.
 
 **Sie haengt an zwei Schaltern.** Ohne `AI_BRAIN_LOGIN` bleibt sie weg — ein Knopf,
 der in ein System fuehrt, in dem der gemeinsame Anmeldeweg fehlt, endet auf einer
