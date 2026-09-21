@@ -52,6 +52,39 @@ class ResolveAiBrainActingUser
     public const CHANNEL_ATTRIBUTE = 'ai_brain_channel';
 
     /**
+     * Es lag eine GUELTIGE, signierte Behauptung an, und sie hat eine Person
+     * dieses Systems aufgeloest.
+     *
+     * ## Warum das noetig ist, obwohl `$request->user()` etwas liefert
+     *
+     * Es liefert IMMER etwas: Ohne Nachweis faellt die Anmeldung auf den
+     * Besitzer des Tokens zurueck. Der ist eine echte Person — die, die die
+     * Verbindung einmal eingerichtet hat. Damit sieht ein Aufruf ohne Absender
+     * genauso aus wie einer von ihr.
+     *
+     * Gemessen am 21.09.2026 im Projekt-Manager: Ein Aufruf ueber den
+     * Komm-Layer OHNE angemeldete Person lieferte 200 Aufgaben, alle einer
+     * einzigen Person zugeordnet — dem Token-Besitzer. Ein Riegel der Form
+     * „keine Person → nichts" war damit wirkungslos, weil der Fall nie eintrat.
+     *
+     * Das ist Bug #728 in neuer Umgebung, und das Learning dazu nennt die
+     * Regel: Ein Tor, das eine pro Anfrage BEHAUPTETE Identitaet prueft, muss
+     * fail-closed sein — fehlt die Behauptung, wird abgelehnt, statt auf den
+     * Token-Besitzer zurueckzufallen.
+     *
+     * ## Wer das pruefen muss
+     *
+     * Jedes Werkzeug, das personenbezogene Daten herausgibt oder eine
+     * Berechtigung an der handelnden Person festmacht. `$request->user()`
+     * allein beantwortet die Frage „wer haelt das Token", nicht „wer fragt".
+     *
+     * Brains eigene Fassung (`SetMcpActingUser`) fuehrt dasselbe Attribut seit
+     * dem 27.07.2026. Hier hat es gefehlt — und deshalb konnten die Produkte
+     * die beiden Faelle nicht unterscheiden.
+     */
+    public const ACTING_ASSERTED_ATTRIBUTE = 'ai_brain_acting_user_asserted';
+
+    /**
      * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
@@ -68,6 +101,13 @@ class ResolveAiBrainActingUser
             if ($user instanceof Authenticatable) {
                 Auth::setUser($user);
                 $request->setUserResolver(fn () => $user);
+
+                // Erst HIER, nicht schon beim Vorliegen des Headers: Gesetzt
+                // wird die Markierung nur, wenn die Signatur gestimmt hat UND
+                // sich daraus eine Person dieses Systems aufloesen liess. Eine
+                // Behauptung ueber jemanden, den es hier nicht gibt, ist keine
+                // Zuschreibung.
+                $request->attributes->set(self::ACTING_ASSERTED_ATTRIBUTE, true);
             } elseif ($user !== null) {
                 // Resolver liefert etwas Unbrauchbares: NICHT durchreichen —
                 // Auth::setUser() würde eine TypeError werfen und den ganzen

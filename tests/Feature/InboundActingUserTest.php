@@ -57,6 +57,82 @@ beforeEach(function () {
     Route::middleware(ResolveAiBrainActingUser::class)->get('/_test/who', fn () => response(
         Auth::user()?->email ?? 'niemand'
     ));
+
+    // Die Frage, die `Auth::user()` NICHT beantwortet: Wurde die Person
+    // nachgewiesen, oder haelt hier nur jemand das Token?
+    Route::middleware(ResolveAiBrainActingUser::class)->get('/_test/nachgewiesen', fn (\Illuminate\Http\Request $r) => response(
+        $r->attributes->get(ResolveAiBrainActingUser::ACTING_ASSERTED_ATTRIBUTE) === true ? 'ja' : 'nein'
+    ));
+});
+
+/*
+| Der Nachweis ist etwas anderes als die Anmeldung (#5946).
+|
+| In einem Produkt ist `$request->user()` NIE leer: Ohne Nachweis faellt die
+| Anmeldung auf den Besitzer des Tokens zurueck — eine echte Person, naemlich
+| die, die die Verbindung eingerichtet hat. Ein Aufruf ohne Absender sieht damit
+| genauso aus wie einer von ihr.
+|
+| Gemessen am 21.09.2026 im Projekt-Manager: Ein Aufruf ueber den Komm-Layer
+| OHNE angemeldete Person lieferte 200 Aufgaben, alle einer einzigen Person
+| zugeordnet — dem Token-Besitzer. Der Riegel „keine Person → nichts" war damit
+| wirkungslos, weil der Fall nie eintrat.
+|
+| Deshalb diese Markierung, und deshalb diese Tests: Sie halten fest, dass sie
+| GENAU dann steht, wenn eine gueltig signierte Behauptung eine Person dieses
+| Systems aufgeloest hat — und sonst nie.
+*/
+
+it('markiert einen gueltig signierten Schreiber als nachgewiesen', function () {
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    AiBrain::resolveInboundUserUsing(fn (string $email) => $email === 'chris@example.test' ? $this->writer : null);
+
+    $this->get('/_test/nachgewiesen', signedHeaders('chris@example.test', 'shared-secret'))
+        ->assertOk()
+        ->assertSee('ja');
+});
+
+it('markiert einen Aufruf ohne Header NICHT als nachgewiesen', function () {
+    // Der wichtigste Fall. Genau hier steht in einem Produkt der
+    // Token-Besitzer in `Auth::user()` — und genau hier muss ein Werkzeug
+    // erkennen koennen, dass niemand etwas behauptet hat.
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+
+    $this->get('/_test/nachgewiesen')->assertOk()->assertSee('nein');
+});
+
+it('markiert eine gefaelschte Signatur NICHT als nachgewiesen', function () {
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    AiBrain::resolveInboundUserUsing(fn () => $this->writer);
+
+    $this->get('/_test/nachgewiesen', signedHeaders('chris@example.test', 'shared-secret', 'sha256=deadbeef'))
+        ->assertOk()
+        ->assertSee('nein');
+});
+
+it('markiert nicht, wenn sich die behauptete Person hier gar nicht aufloesen laesst', function () {
+    // Eine Behauptung ueber jemanden, den es hier nicht gibt, ist keine
+    // Zuschreibung — auch wenn die Signatur stimmt. Der Aufruf laeuft weiter
+    // (best-effort), aber er gilt nicht als nachgewiesen.
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    AiBrain::resolveInboundUserUsing(fn () => null);
+
+    $this->get('/_test/nachgewiesen', signedHeaders('niemand@example.test', 'shared-secret'))
+        ->assertOk()
+        ->assertSee('nein');
+});
+
+it('markiert auch ohne konfiguriertes Secret, wenn die Person aufloest', function () {
+    // Fail-safe wie beim Rest der Middleware: Ohne Secret gibt es nichts zu
+    // pruefen, dann traegt allein das Token die Authentifizierung. Eine frische
+    // Installation soll ohne Secret-Verteilung laufen — sonst waere der
+    // Nachweis von einer Konfiguration abhaengig, die es noch nicht gibt.
+    config()->set('ai-brain-bridge.events.secret', null);
+    AiBrain::resolveInboundUserUsing(fn () => $this->writer);
+
+    $this->get('/_test/nachgewiesen', [ResolveAiBrainActingUser::ACTING_USER_HEADER => 'chris@example.test'])
+        ->assertOk()
+        ->assertSee('ja');
 });
 
 function signedHeaders(string $email, string $secret, ?string $sig = null): array
