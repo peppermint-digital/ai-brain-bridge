@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \Peppermint\AiBrainBridge\AiBrainManager resolveInboundUserUsing(?callable $resolver)
  * @method static mixed resolveInboundUser(string $email)
  * @method static ?string actingSecret()
+ * @method static bool actingUserAsserted()
  * @method static ?string inboundChannel()
  * @method static \Peppermint\AiBrainBridge\Mcp\McpClient brain()
  * @method static \Peppermint\AiBrainBridge\Mcp\McpClient mcp(string $url)

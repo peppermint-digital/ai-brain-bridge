@@ -194,6 +194,43 @@ class AiBrainManager
     }
 
     /**
+     * Wurde die handelnde Person NACHGEWIESEN — oder haelt hier nur jemand das
+     * Token?
+     *
+     * ## Die Frage, die `auth()->user()` nicht beantwortet
+     *
+     * In einem Produkt ist `auth()->user()` nie leer: Ohne Nachweis faellt die
+     * Anmeldung auf den Besitzer des Tokens zurueck, und der ist eine echte
+     * Person — die, die die Verbindung eingerichtet hat. Ein Aufruf ohne
+     * Absender sieht damit genauso aus wie einer von ihr.
+     *
+     * Gemessen am 21.09.2026 im Projekt-Manager: Ein Aufruf ueber den
+     * Komm-Layer ohne angemeldete Person lieferte 200 Aufgaben, alle dem
+     * Token-Besitzer zugeordnet. Ein Riegel „keine Person → nichts" war
+     * wirkungslos, weil sein Fall nie eintrat (Bug #728 in neuer Umgebung).
+     *
+     * ## Warum hier und nicht am Request-Attribut
+     *
+     * Ein MCP-Werkzeug bekommt `Laravel\Mcp\Request` — das ist NICHT die
+     * HTTP-Anfrage. Es hat keine Attribute und loest den Benutzer ueber den
+     * Auth-Resolver auf. Wer dort `$request->attributes` liest, greift ins
+     * Leere, und zwar lautlos: Der Riegel waere immer zu. Deshalb die Auskunft
+     * hier, wo die echte Anfrage erreichbar ist — dasselbe Muster wie
+     * {@see inboundChannel()}.
+     *
+     * ## Wer das fragen muss
+     *
+     * Jedes Werkzeug, das personenbezogene Daten herausgibt oder eine
+     * Berechtigung an der handelnden Person festmacht.
+     */
+    public function actingUserAsserted(): bool
+    {
+        return request()->attributes->get(
+            \Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser::ACTING_ASSERTED_ATTRIBUTE
+        ) === true;
+    }
+
+    /**
      * Führt $callback als SERVICE aus — ohne Acting-User-Delegation. Für
      * Health-Checks, Infra- und Hintergrund-Calls (kein End-User im Spiel):
      * sie laufen dann als Service-Principal in AI Brain, nicht als der zufällig

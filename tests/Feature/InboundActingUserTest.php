@@ -122,6 +122,26 @@ it('markiert nicht, wenn sich die behauptete Person hier gar nicht aufloesen lae
         ->assertSee('nein');
 });
 
+it('beantwortet die Frage auch dort, wo es keine HTTP-Anfrage gibt', function () {
+    // Der Grund, warum die Auskunft am Manager haengt und nicht am
+    // Request-Attribut: Ein MCP-Werkzeug bekommt `Laravel\Mcp\Request`, und
+    // das ist NICHT die HTTP-Anfrage — es hat keine Attribute. Wer dort
+    // `$request->attributes` liest, greift lautlos ins Leere, und der Riegel
+    // waere immer zu.
+    config()->set('ai-brain-bridge.events.secret', 'shared-secret');
+    AiBrain::resolveInboundUserUsing(fn (string $email) => $email === 'chris@example.test' ? $this->writer : null);
+
+    Route::middleware(ResolveAiBrainActingUser::class)->get('/_test/ueber-facade', fn () => response(
+        AiBrain::actingUserAsserted() ? 'ja' : 'nein'
+    ));
+
+    $this->get('/_test/ueber-facade', signedHeaders('chris@example.test', 'shared-secret'))
+        ->assertOk()
+        ->assertSee('ja');
+
+    $this->get('/_test/ueber-facade')->assertOk()->assertSee('nein');
+});
+
 it('markiert auch ohne konfiguriertes Secret, wenn die Person aufloest', function () {
     // Fail-safe wie beim Rest der Middleware: Ohne Secret gibt es nichts zu
     // pruefen, dann traegt allein das Token die Authentifizierung. Eine frische
