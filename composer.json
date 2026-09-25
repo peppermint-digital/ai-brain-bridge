@@ -2,7 +2,7 @@
     "name": "peppermint/ai-brain-bridge",
     "description": "Einheitlicher Kommunikationslayer (MCP + Events) zwischen Peppermint-Produkten und AI Brain.",
     "type": "library",
-    "license": "proprietary",
+    "license": "MIT",
     "keywords": [
         "peppermint",
         "ai-brain",
