@@ -418,7 +418,7 @@ class AiBrainManager
      * Nur Systeme, fuer die dieses hier freigeschaltet ist; das eigene steht
      * nicht darin. Ein Fehlschlag ist eine leere Liste.
      *
-     * @return array<int, array{slug: string, name: string|null, url: string|null}>
+     * @return array<int, array{slug: string, name: string|null, url: string|null, capabilities: array<int, string>}>
      */
     public function providers(string $capability, ?string $actingAs = null, ?string $channel = null): array
     {

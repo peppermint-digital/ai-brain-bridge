@@ -31,12 +31,22 @@ it('nennt die Systeme samt Adresse', function () {
         'ok' => true,
         'capability' => 'calendar.events.list',
         'providers' => [
-            ['slug' => 'peppermint-manager', 'name' => 'Peppermint Manager', 'url' => 'https://pm.test'],
+            [
+                'slug' => 'peppermint-manager',
+                'name' => 'Peppermint Manager',
+                'url' => 'https://pm.test',
+                'capabilities' => ['calendar.events.list', 'calendar.events.create'],
+            ],
         ],
     ]));
 
     expect(AiBrain::providers('calendar.events.list'))->toBe([
-        ['slug' => 'peppermint-manager', 'name' => 'Peppermint Manager', 'url' => 'https://pm.test'],
+        [
+            'slug' => 'peppermint-manager',
+            'name' => 'Peppermint Manager',
+            'url' => 'https://pm.test',
+            'capabilities' => ['calendar.events.list', 'calendar.events.create'],
+        ],
     ]);
 
     Http::assertSent(fn ($anfrage) => str_contains($anfrage->url(), '/api/v1/capabilities/calendar.events.list/providers'));
@@ -55,7 +65,7 @@ it('ergaenzt fehlende Angaben mit null, statt die Zeile zu verwerfen', function 
     ]));
 
     expect(AiBrain::providers('calendar.events.list'))->toBe([
-        ['slug' => 'peppermint-verwaltung', 'name' => null, 'url' => null],
+        ['slug' => 'peppermint-verwaltung', 'name' => null, 'url' => null, 'capabilities' => []],
     ]);
 });
 
@@ -83,4 +93,19 @@ it('ist leer, wenn die Antwort kein JSON ist', function () {
     brainAntwortet(Http::response('<html>502</html>', 502));
 
     expect(AiBrain::providers('calendar.events.list'))->toBe([]);
+});
+
+it('wirft Faehigkeiten weg, die keine Zeichenketten sind', function () {
+    // Eine Liste, in der eine Zahl steht, wuerde spaeter gegen Vorgangsnamen
+    // verglichen — und `in_array` mit lockerem Vergleich haelt 0 fuer jeden
+    // Namen. Lieber hier aussortieren als dort raten.
+    brainAntwortet(Http::response([
+        'ok' => true,
+        'providers' => [[
+            'slug' => 'peppermint-manager',
+            'capabilities' => ['calendar.events.list', 0, null, ['verschachtelt']],
+        ]],
+    ]));
+
+    expect(AiBrain::providers('calendar.events.list')[0]['capabilities'])->toBe(['calendar.events.list']);
 });

@@ -115,7 +115,7 @@ class GatewayClient
      * Wer den Netzweg sparen will, legt den Speicher dort an, wo die Quellen
      * gebaut werden — die Entscheidung gehoert der Anwendung.
      *
-     * @return array<int, array{slug: string, name: string|null, url: string|null}>
+     * @return array<int, array{slug: string, name: string|null, url: string|null, capabilities: array<int, string>}>
      */
     public function providers(string $capability): array
     {
@@ -151,6 +151,14 @@ class GatewayClient
                 'slug' => (string) $zeile['slug'],
                 'name' => isset($zeile['name']) ? (string) $zeile['name'] : null,
                 'url' => isset($zeile['url']) ? (string) $zeile['url'] : null,
+                // Was dieses System kann UND wir ausloesen duerfen. Ohne die
+                // Liste muesste der Aufrufer je Vorgang erneut fragen — und
+                // raten darf er nicht: Ein Knopf, der beim Druecken abgewiesen
+                // wird, ist schlechter als keiner.
+                'capabilities' => array_values(array_filter(
+                    (array) ($zeile['capabilities'] ?? []),
+                    'is_string',
+                )),
             ];
         }
 

@@ -88,8 +88,19 @@ und es fällt niemandem auf.
 
 ```php
 AiBrain::providers('calendar.events.list');
-// [['slug' => 'peppermint-manager', 'name' => 'Peppermint Manager', 'url' => 'https://pm…']]
+// [[
+//   'slug' => 'peppermint-manager',
+//   'name' => 'Peppermint Manager',
+//   'url'  => 'https://pm…',                      // fürs Sprungziel, nicht die MCP-Adresse
+//   'capabilities' => ['calendar.events.list', …], // was es kann UND wir dürfen
+// ]]
 ```
+
+`capabilities` ist die **Schnittmenge** aus dem, was das System anbietet, und
+dem, was dieses hier auslösen darf. Ohne sie müsste man je Vorgang erneut
+fragen — für einen Kalender sechsmal, nur um zu wissen, ob „löschen"
+erscheinen darf. Und raten darf man nicht: Ein Knopf, der beim Drücken
+abgewiesen wird, ist schlechter als keiner.
 
 Das Gegenstück zu `gateway()`, das das Zielsystem bewusst verschweigt. Für
 einen Kalender ist es Inhalt: Jedes angebundene System wird eine eigene Quelle
