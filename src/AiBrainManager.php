@@ -408,6 +408,27 @@ class AiBrainManager
         ))->call($capability, $arguments, $product);
     }
 
+    /**
+     * Welche Systeme bedienen einen Vorgang? (#7490)
+     *
+     * Gegenstueck zu `gateway()`, das das Zielsystem bewusst verschweigt. Fuer
+     * einen Kalender ist es Inhalt: Jedes angebundene System wird eine eigene
+     * Quelle mit Farbe, Filterknopf und „hier anlegen".
+     *
+     * Nur Systeme, fuer die dieses hier freigeschaltet ist; das eigene steht
+     * nicht darin. Ein Fehlschlag ist eine leere Liste.
+     *
+     * @return array<int, array{slug: string, name: string|null, url: string|null}>
+     */
+    public function providers(string $capability, ?string $actingAs = null, ?string $channel = null): array
+    {
+        return (new GatewayClient(
+            $this->config,
+            $this->tokens,
+            fn (): array => $this->actingUserHeaders($actingAs, $channel),
+        ))->providers($capability);
+    }
+
     public function brain(): McpClient
     {
         $url = $this->config['mcp']['brain_url']

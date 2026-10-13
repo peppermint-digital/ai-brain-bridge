@@ -64,6 +64,40 @@ AiBrain::call('create-task-tool', ['project' => '…', 'title' => 'Aus Mail erst
 $res = AiBrain::mcp('https://pm.peppermint-digital.com/mcp/peppermint')->callTool('…', [...]);
 ```
 
+### Gateway — ein Vorgang bei einem ANDEREN Produkt (K11)
+
+Man nennt einen **Vorgang**, kein Zielsystem. Wer ihn bedient, weiß das
+Fähigkeits-Register in AI Brain — gemessen, nicht gepflegt. Damit muss die
+Verwaltung nicht wissen, wo Aufgaben liegen; sie muss nur wissen, dass sie
+welche braucht.
+
+```php
+$r = AiBrain::gateway('tasks.create', ['title' => 'Aus Ticket 5']);
+// ['ok' => true, 'data' => [...], 'product' => 'peppermint-manager', ...]
+```
+
+Fehler sind unterscheidbar und schlagen **nicht** als Ausnahme hoch:
+`not_offered` (das kann gerade niemand), `not_allowed` (dieses System darf das
+nicht), `unreachable` (das Ziel antwortet nicht), `tool_failed` (das Ziel hat
+abgelehnt). Fail-closed: Ohne Freigabe in Brains `gateway_grants` ist der Weg
+zu — **die Freigabe wird eingetragen, BEVOR das Produkt umgebaut wird.**
+Andersherum stehen Auswahllisten leer da, mit „nicht freigeschaltet" im Log,
+und es fällt niemandem auf.
+
+**Und wer bedient ihn?**
+
+```php
+AiBrain::providers('calendar.events.list');
+// [['slug' => 'peppermint-manager', 'name' => 'Peppermint Manager', 'url' => 'https://pm…']]
+```
+
+Das Gegenstück zu `gateway()`, das das Zielsystem bewusst verschweigt. Für
+einen Kalender ist es Inhalt: Jedes angebundene System wird eine eigene Quelle
+mit Farbe, Filterknopf und „hier anlegen". Zurück kommen nur Systeme, für die
+dieses hier freigeschaltet ist; das eigene steht nicht darin, und ein
+Fehlschlag ist eine leere Liste — der eigene Kalender soll nicht leer werden,
+weil die Auskunft fehlt.
+
 ### Channels — „ein Chat pro Channel"
 Läuft über den **einheitlichen MCP-Weg** (`/mcp/brain`, OAuth `mcp:use`) — dieselbe
 Schiene wie alle anderen Tools.

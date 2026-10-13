@@ -88,6 +88,76 @@ class GatewayClient
     }
 
     /**
+     * Welche Systeme bedienen einen Vorgang? (#7490)
+     *
+     * ## Warum das NICHT dasselbe ist wie `call()`
+     *
+     * `call()` nennt einen Vorgang und verschweigt das Zielsystem — genau
+     * richtig fuer „lege eine Aufgabe an": Das aufrufende System soll nicht
+     * wissen muessen, wo Aufgaben liegen.
+     *
+     * Fuer einen Kalender ist das Zielsystem keine Verlegenheit, sondern
+     * Inhalt: Jedes angebundene System wird eine eigene Quelle mit eigener
+     * Farbe, eigenem Filterknopf und eigenem „hier anlegen". Dafuer braucht
+     * man die Liste, nicht nur den ersten Treffer.
+     *
+     * ## Was zurueckkommt
+     *
+     * Nur Systeme, fuer die DIESES System freigeschaltet ist — Brain filtert
+     * nach denselben Freigaben wie beim Weiterleiten. Das eigene System steht
+     * nicht darin. Ein Fehlschlag ist eine leere Liste und keine Ausnahme:
+     * Wer die Anbieter nicht erfragen kann, hat eben keine fremden Quellen,
+     * und der eigene Kalender soll davon nicht leer werden.
+     *
+     * Bewusst OHNE Zwischenspeicher. Das Register wird in Brain gemessen und
+     * nicht gepflegt; ein Zwischenspeicher hier wuerde ein neu angebundenes
+     * System verspaetet erscheinen und ein abgeschaltetes nachwirken lassen.
+     * Wer den Netzweg sparen will, legt den Speicher dort an, wo die Quellen
+     * gebaut werden — die Entscheidung gehoert der Anwendung.
+     *
+     * @return array<int, array{slug: string, name: string|null, url: string|null}>
+     */
+    public function providers(string $capability): array
+    {
+        $url = rtrim((string) ($this->config['base_url'] ?? ''), '/')
+            .'/api/v1/capabilities/'.rawurlencode($capability).'/providers';
+
+        try {
+            $antwort = Http::withToken($this->tokens->token())
+                ->withHeaders(($this->actingHeaders)())
+                ->acceptJson()
+                ->timeout((int) ($this->config['gateway']['timeout'] ?? 20))
+                ->get($url);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $daten = $antwort->json();
+
+        if (! is_array($daten) || ! ($daten['ok'] ?? false)) {
+            return [];
+        }
+
+        $anbieter = [];
+
+        foreach ((array) ($daten['providers'] ?? []) as $zeile) {
+            // Ohne Slug ist eine Zeile unbrauchbar: Er ist es, mit dem der
+            // naechste Aufruf adressiert wird.
+            if (! is_array($zeile) || ! isset($zeile['slug'])) {
+                continue;
+            }
+
+            $anbieter[] = [
+                'slug' => (string) $zeile['slug'],
+                'name' => isset($zeile['name']) ? (string) $zeile['name'] : null,
+                'url' => isset($zeile['url']) ? (string) $zeile['url'] : null,
+            ];
+        }
+
+        return $anbieter;
+    }
+
+    /**
      * @return array{ok: bool, data: null, text: null, error: string, message: string, product: null}
      */
     protected function fehler(string $klasse, string $meldung): array
