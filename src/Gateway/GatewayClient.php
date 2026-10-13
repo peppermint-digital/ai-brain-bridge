@@ -115,7 +115,7 @@ class GatewayClient
      * Wer den Netzweg sparen will, legt den Speicher dort an, wo die Quellen
      * gebaut werden — die Entscheidung gehoert der Anwendung.
      *
-     * @return array<int, array{slug: string, name: string|null, url: string|null, capabilities: array<int, string>}>
+     * @return array<int, array{slug: string, name: string|null, key: string, label: string, url: string|null, capabilities: array<int, string>}>
      */
     public function providers(string $capability): array
     {
@@ -147,9 +147,27 @@ class GatewayClient
                 continue;
             }
 
+            $slug = (string) $zeile['slug'];
+            $name = isset($zeile['name']) ? (string) $zeile['name'] : null;
+
             $anbieter[] = [
-                'slug' => (string) $zeile['slug'],
-                'name' => isset($zeile['name']) ? (string) $zeile['name'] : null,
+                'slug' => $slug,
+                'name' => $name,
+                // Der KURZE Schluessel und die kurze Beschriftung — an EINER
+                // Stelle abgeleitet, nicht in jedem Produkt neu.
+                //
+                // Das ist keine Bequemlichkeit: Der Schluessel steckt in den
+                // Termin-Kennungen („manager:7") und in den gespeicherten
+                // Filtern der Nutzer. Leitete ihn jedes Produkt selbst ab,
+                // hiesse dasselbe System in zwei Oberflaechen irgendwann
+                // verschieden — und ein gespeicherter Filter waere stumm
+                // falsch, ohne dass etwas bricht.
+                //
+                // Hier und nicht im Kalender-Paket, weil es Peppermint-Wissen
+                // ist: Dass unsere Produkte `peppermint-` vorne tragen, geht
+                // ein fremdes Kalender-Paket nichts an.
+                'key' => $this->kurzerSchluessel($slug),
+                'label' => $this->kurzeBeschriftung($name, $slug),
                 'url' => isset($zeile['url']) ? (string) $zeile['url'] : null,
                 // Was dieses System kann UND wir ausloesen duerfen. Ohne die
                 // Liste muesste der Aufrufer je Vorgang erneut fragen — und
@@ -163,6 +181,25 @@ class GatewayClient
         }
 
         return $anbieter;
+    }
+
+    /** `peppermint-verwaltung` wird zu `verwaltung`. */
+    protected function kurzerSchluessel(string $slug): string
+    {
+        return str_starts_with($slug, 'peppermint-') ? substr($slug, strlen('peppermint-')) : $slug;
+    }
+
+    /**
+     * `Peppermint Verwaltung` wird zu `Verwaltung`.
+     *
+     * Faellt auf den Slug zurueck, wenn kein Name kommt — eine Quelle ohne
+     * Beschriftung waere ein Filterknopf ohne Aufschrift.
+     */
+    protected function kurzeBeschriftung(?string $name, string $slug): string
+    {
+        $kurz = trim(str_replace('Peppermint', '', (string) $name));
+
+        return $kurz !== '' ? $kurz : $this->kurzerSchluessel($slug);
     }
 
     /**

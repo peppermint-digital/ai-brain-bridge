@@ -91,10 +91,19 @@ AiBrain::providers('calendar.events.list');
 // [[
 //   'slug' => 'peppermint-manager',
 //   'name' => 'Peppermint Manager',
+//   'key'   => 'manager',                        // Slug ohne das gemeinsame Präfix
+//   'label' => 'Manager',                        // Name ohne „Peppermint"
 //   'url'  => 'https://pm…',                      // fürs Sprungziel, nicht die MCP-Adresse
 //   'capabilities' => ['calendar.events.list', …], // was es kann UND wir dürfen
 // ]]
 ```
+
+`key` und `label` werden **hier** abgeleitet und nicht in jedem Produkt neu.
+Das ist keine Bequemlichkeit: Der Schlüssel steckt in den Termin-Kennungen
+(`manager:7`) und in den gespeicherten Filtern der Nutzer. Leitete ihn jedes
+Produkt selbst ab, hieße dasselbe System in zwei Oberflächen irgendwann
+verschieden — und ein gespeicherter Filter wäre stumm falsch, ohne dass etwas
+bricht.
 
 `capabilities` ist die **Schnittmenge** aus dem, was das System anbietet, und
 dem, was dieses hier auslösen darf. Ohne sie müsste man je Vorgang erneut

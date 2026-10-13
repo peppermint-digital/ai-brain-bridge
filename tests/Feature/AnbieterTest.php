@@ -44,6 +44,8 @@ it('nennt die Systeme samt Adresse', function () {
         [
             'slug' => 'peppermint-manager',
             'name' => 'Peppermint Manager',
+            'key' => 'manager',
+            'label' => 'Manager',
             'url' => 'https://pm.test',
             'capabilities' => ['calendar.events.list', 'calendar.events.create'],
         ],
@@ -65,7 +67,16 @@ it('ergaenzt fehlende Angaben mit null, statt die Zeile zu verwerfen', function 
     ]));
 
     expect(AiBrain::providers('calendar.events.list'))->toBe([
-        ['slug' => 'peppermint-verwaltung', 'name' => null, 'url' => null, 'capabilities' => []],
+        [
+            'slug' => 'peppermint-verwaltung',
+            'name' => null,
+            'key' => 'verwaltung',
+            // Ohne Namen faellt die Beschriftung auf den kurzen Schluessel
+            // zurueck — ein Filterknopf ohne Aufschrift waere schlimmer.
+            'label' => 'verwaltung',
+            'url' => null,
+            'capabilities' => [],
+        ],
     ]);
 });
 
@@ -108,4 +119,26 @@ it('wirft Faehigkeiten weg, die keine Zeichenketten sind', function () {
     ]));
 
     expect(AiBrain::providers('calendar.events.list')[0]['capabilities'])->toBe(['calendar.events.list']);
+});
+
+it('leitet Schluessel und Beschriftung an EINER Stelle ab', function () {
+    // Der Schluessel steckt in den Termin-Kennungen und in den gespeicherten
+    // Filtern der Nutzer. Leitete ihn jedes Produkt selbst ab, hiesse dasselbe
+    // System in zwei Oberflaechen irgendwann verschieden — und ein
+    // gespeicherter Filter waere stumm falsch, ohne dass etwas bricht.
+    brainAntwortet(Http::response([
+        'ok' => true,
+        'providers' => [
+            ['slug' => 'peppermint-crm', 'name' => 'Peppermint CRM'],
+            // Ein System ohne das gemeinsame Praefix bleibt, wie es heisst.
+            ['slug' => 'crewtex-shop', 'name' => 'Crewtex Shop'],
+        ],
+    ]));
+
+    $anbieter = AiBrain::providers('calendar.events.list');
+
+    expect($anbieter[0]['key'])->toBe('crm')
+        ->and($anbieter[0]['label'])->toBe('CRM')
+        ->and($anbieter[1]['key'])->toBe('crewtex-shop')
+        ->and($anbieter[1]['label'])->toBe('Crewtex Shop');
 });
