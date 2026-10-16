@@ -216,3 +216,24 @@ it('verlangt BEIDE Routen', function () {
 
     expect(app(SwitcherController::class)->markup())->not->toContain('postfach=');
 });
+
+it('beantwortet dieselbe Frage fuer das Produkt wie fuer die Leiste', function () {
+    // Das Produkt laesst seine eigene Glocke genau dann weg. Liefen die
+    // beiden Antworten auseinander, waere der schlimme Fall nicht die
+    // doppelte Anzeige, sondern gar keine.
+    expect(SwitcherController::zeigtPostfach())->toBeFalse();
+
+    Route::get('notifications/inbox', fn () => '')->name('notifications.inbox');
+    Route::get('api/inbox/unread-count', fn () => '')->name('inbox.api.unread-count');
+
+    // Nur im Test noetig: Die Namensliste des Routers ist zu diesem Zeitpunkt
+    // schon gebaut, und `Route::has` liest sie. Im Betrieb stehen alle Routen
+    // beim Hochfahren.
+    Route::getRoutes()->refreshNameLookups();
+
+    expect(SwitcherController::zeigtPostfach())->toBeTrue();
+
+    config()->set('ai-brain-bridge.switcher.enabled', false);
+
+    expect(SwitcherController::zeigtPostfach())->toBeFalse();
+});

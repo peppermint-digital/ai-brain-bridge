@@ -268,12 +268,31 @@ class SwitcherController
      */
     protected function postfach(): string
     {
-        if (! Route::has('notifications.inbox') || ! Route::has('inbox.api.unread-count')) {
+        if (! self::zeigtPostfach()) {
             return '';
         }
 
         return ' postfach="'.e(route('notifications.inbox')).'"'
             .' postfach-zaehler="'.e(route('inbox.api.unread-count')).'"';
+    }
+
+    /**
+     * Haengt der Posteingang dieses Produkts in der Leiste?
+     *
+     * Die Frage stellt sich an zwei Stellen, und sie muss an beiden gleich
+     * beantwortet werden: hier, beim Zeichnen der Kachel — und im Produkt,
+     * das seine eigene Glocke genau dann weglaesst.
+     *
+     * Liefen die beiden auseinander, waere der schlimme Fall nicht die
+     * doppelte Anzeige, sondern die gar keine: keine Kachel, keine Glocke,
+     * und der Posteingang nur noch ueber die Adresszeile erreichbar.
+     */
+    public static function zeigtPostfach(): bool
+    {
+        return (bool) config('ai-brain-bridge.switcher.enabled')
+            && (bool) config('ai-brain-bridge.login.enabled')
+            && Route::has('notifications.inbox')
+            && Route::has('inbox.api.unread-count');
     }
 
     /**
