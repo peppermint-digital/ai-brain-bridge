@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Peppermint\AiBrainBridge\Http\Controllers\SwitcherController;
 
@@ -182,4 +183,36 @@ it('zieht beim Rendern einer Seite NIEMALS zu AI Brain los', function () {
     // nach dem Laden selbst.
     expect($markup)->toContain('peppermint-app-switcher')
         ->and($markup)->not->toContain('apps=');
+});
+
+/* ------------------------------------------------ die Postfach-Kachel */
+
+it('schreibt kein Postfach ins Layout, wenn das Produkt keinen Posteingang hat', function () {
+    // Der Normalfall fuer ein Produkt ohne peppermint/notifications. Ein
+    // Symbol, das auf einen 404 fuehrt, ist schlimmer als keines.
+    $this->actingAs($this->person);
+
+    expect(app(SwitcherController::class)->markup())->not->toContain('postfach=');
+});
+
+it('schreibt das Postfach ins Layout, sobald beide Routen stehen', function () {
+    Route::get('notifications/inbox', fn () => '')->name('notifications.inbox');
+    Route::get('api/inbox/unread-count', fn () => '')->name('inbox.api.unread-count');
+
+    $this->actingAs($this->person);
+
+    $markup = app(SwitcherController::class)->markup();
+
+    expect($markup)->toContain('postfach="http://localhost/notifications/inbox"')
+        ->and($markup)->toContain('postfach-zaehler="http://localhost/api/inbox/unread-count"');
+});
+
+it('verlangt BEIDE Routen', function () {
+    // Nur die Seite ohne den Zaehler ergaebe eine Kachel, die nie ein
+    // Abzeichen bekommt — und damit aussieht, als waere nie etwas da.
+    Route::get('notifications/inbox', fn () => '')->name('notifications.inbox');
+
+    $this->actingAs($this->person);
+
+    expect(app(SwitcherController::class)->markup())->not->toContain('postfach=');
 });

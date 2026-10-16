@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
 use Peppermint\AiBrainBridge\Config\BridgeConfig;
 use Peppermint\AiBrainBridge\Facades\AiBrain;
@@ -240,10 +241,39 @@ class SwitcherController
         $bereit = Cache::get($this->schluessel($user));
         $liste = is_array($bereit) ? ' apps="'.e((string) json_encode($bereit)).'"' : '';
 
+        $postfach = $this->postfach();
+
         return <<<HTML
             <script src="{$script}" defer></script>
-            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}" pin-endpoint="{$pins}"{$liste}></peppermint-app-switcher>
+            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}" pin-endpoint="{$pins}"{$postfach}{$liste}></peppermint-app-switcher>
             HTML;
+    }
+
+    /**
+     * Die Attribute fuer die Postfach-Kachel — oder nichts.
+     *
+     * ## Warum die Leiste und nicht die Anwendung
+     *
+     * Die Glocke sass bisher in jedem Produkt und meinte dort nur dessen
+     * eigene Meldungen. Seit AI Brain spiegelt, steht in jedem System alles;
+     * vier Glocken mit demselben Inhalt sind drei zu viel. Der Posteingang
+     * gehoert deshalb dorthin, wo man ohnehin zwischen den Systemen wechselt.
+     *
+     * ## Warum ueber Routen-Namen und nicht ueber feste Pfade
+     *
+     * Ein Produkt ohne `peppermint/notifications` hat keine
+     * Posteingangs-Seite. Ein Symbol, das dort auf einen 404 fuehrt, ist
+     * schlimmer als keines — also erscheint es nur, wenn beide Routen
+     * wirklich registriert sind.
+     */
+    protected function postfach(): string
+    {
+        if (! Route::has('notifications.inbox') || ! Route::has('inbox.api.unread-count')) {
+            return '';
+        }
+
+        return ' postfach="'.e(route('notifications.inbox')).'"'
+            .' postfach-zaehler="'.e(route('inbox.api.unread-count')).'"';
     }
 
     /**

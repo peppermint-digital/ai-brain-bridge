@@ -18,8 +18,14 @@
  * EINBINDEN:
  *
  *     <script src="/switcher/app-switcher.js?v=13" defer></script>
- *     <peppermint-app-switcher endpoint="/switcher/apps" aktuell="ai-brain">
+ *     <peppermint-app-switcher endpoint="/switcher/apps" aktuell="ai-brain"
+ *                              postfach="/notifications/inbox"
+ *                              postfach-zaehler="/api/inbox/unread-count">
  *     </peppermint-app-switcher>
+ *
+ * `postfach` und `postfach-zaehler` sind freiwillig: Ohne sie erscheint keine
+ * Postfach-Kachel. Ein Produkt ohne das Benachrichtigungspaket hat keine
+ * Posteingangs-Seite, und ein Symbol auf einen 404 ist schlimmer als keines.
  *
  * ABSCHALTEN fuer einzelne Ansichten (Avatar-Vollbild, Praesentationen):
  *
@@ -28,7 +34,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.7.1';
+    const VERSION = '1.8.0';
 
     /**
      * Die Symbole, die ein Merkzettel tragen kann (#5320).
@@ -105,6 +111,18 @@
         gluehbirne: 'Idee',
     };
 
+    /**
+     * Das Postfach-Symbol — ein Briefkasten mit aufgeklappter Lasche.
+     *
+     * Bewusst nicht die Glocke: Die stand bisher IN jeder Anwendung und
+     * meinte dort nur deren eigene Meldungen. Hier geht es um den Posteingang
+     * ueber alle Systeme hinweg, und ein neuer Ort verdient ein eigenes Bild.
+     */
+    const POSTFACH_PFAD = 'M3 12h4l1 2h8l1-2h4M3 12l2-7h14l2 7v6H3zM9 8h6';
+
+    /** Wie oft der Zaehler nachgefragt wird. */
+    const POSTFACH_TAKT = 60 * 1000;
+
     const SPEICHER = 'peppermint-switcher-apps';
     const HALTBAR = 5 * 60 * 1000;
     const NACHLAUF = 260;
@@ -159,6 +177,11 @@
 
             this.themaFolgen();
             this.laden();
+
+            if (this.hatPostfach()) {
+                void this.postfachZaehlen();
+                this.postfachUhr = setInterval(() => void this.postfachZaehlen(), POSTFACH_TAKT);
+            }
         }
 
         disconnectedCallback() {
@@ -166,6 +189,7 @@
             document.removeEventListener('pointerdown', this.aufKlickAussen);
             this.themaWaechter?.disconnect();
             clearTimeout(this.schliessUhr);
+            clearInterval(this.postfachUhr);
         }
 
         /* ---------------------------------------------------------------- */
@@ -287,7 +311,12 @@
             // Ein einziger Eintrag und kein Merkzettel heisst: es gibt nichts
             // zu wechseln. Dann ist auch der Griff zu viel — er verspraeche
             // eine Wahl.
-            const zeigen = this.apps.length > 1 || this.pins.length > 0;
+            //
+            // Das Postfach zaehlt dazu: Es ist seit #7995 der einzige Ort, an
+            // dem der Posteingang noch haengt — die Glocke in der Anwendung
+            // ist dafuer weggefallen. Eine Leiste, die sich wegen eines
+            // einzelnen Systems versteckt, versteckte ihn mit.
+            const zeigen = this.apps.length > 1 || this.pins.length > 0 || this.hatPostfach();
 
             this.wrap.hidden = !zeigen;
 
@@ -338,10 +367,113 @@
                 ? '<span class="trenner" aria-hidden="true"></span>'
                 : '';
 
-            this.leiste.innerHTML = systeme.join('') + trenner + merkzettel.join('') + this.anpinnKnopf();
+            this.leiste.innerHTML = this.postfachKnopf() + systeme.join('') + trenner
+                + merkzettel.join('') + this.anpinnKnopf();
 
             this.bilderAbsichern();
             this.knoepfeVerdrahten();
+        }
+
+        /* ------------------------------------------------- das Postfach */
+
+        /**
+         * Haengt an dieser Leiste ein Postfach?
+         *
+         * Nur, wenn das Produkt eine Adresse mitgegeben hat. Ein Produkt ohne
+         * das Benachrichtigungspaket hat keine Posteingangs-Seite, und ein
+         * Symbol, das auf einen 404 fuehrt, ist schlimmer als keines.
+         */
+        hatPostfach() {
+            return typeof this.getAttribute('postfach') === 'string'
+                && this.getAttribute('postfach') !== '';
+        }
+
+        /**
+         * Die Postfach-Kachel — ganz links, vor den Systemen.
+         *
+         * Links, weil sie kein System ist, sondern das, was aus allen zusammen
+         * kommt. Rechts bei den Merkzetteln stuende sie zwischen Dingen, die
+         * man sich selbst abgelegt hat und jederzeit loeschen kann.
+         */
+        postfachKnopf() {
+            if (!this.hatPostfach()) {
+                return '';
+            }
+
+            const ungelesen = this.postfachZahl || 0;
+
+            // Dreistellig passt nicht auf ein Abzeichen dieser Groesse, und
+            // die genaue Zahl ist ab da ohnehin keine Hilfe mehr.
+            const text = ungelesen > 99 ? '99+' : String(ungelesen);
+
+            const abzeichen = ungelesen > 0
+                ? `<span class="postfach-zahl">${this.sicher(text)}</span>`
+                : '';
+
+            const beschriftung = ungelesen > 0
+                ? `Posteingang, ${ungelesen} ungelesen`
+                : 'Posteingang';
+
+            return `
+                <a class="knopf postfach" href="${this.sicher(this.getAttribute('postfach'))}"
+                   aria-label="${this.sicher(beschriftung)}">
+                    <span class="kachel postfach-kachel">
+                        <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
+                             stroke="currentColor" stroke-width="1.7"
+                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="${POSTFACH_PFAD}"></path>
+                        </svg>
+                        ${abzeichen}
+                    </span>
+                    <span class="hinweis" role="tooltip">${this.sicher(beschriftung)}</span>
+                </a>`;
+        }
+
+        /**
+         * Den Zaehler holen und im Takt nachfuehren.
+         *
+         * Scheitert der Abruf, bleibt die letzte bekannte Zahl stehen und es
+         * wird nichts gezeichnet. Eine Null wegen eines Netzaussetzers waere
+         * die falsche Aussage — sie hiesse „alles gelesen".
+         */
+        async postfachZaehlen() {
+            const adresse = this.getAttribute('postfach-zaehler');
+
+            if (!adresse) {
+                return;
+            }
+
+            try {
+                const antwort = await fetch(adresse, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+
+                if (!antwort.ok) {
+                    return;
+                }
+
+                const daten = await antwort.json();
+                const zahl = Number(daten.unread_count);
+
+                if (!Number.isFinite(zahl) || zahl === this.postfachZahl) {
+                    return;
+                }
+
+                this.postfachZahl = zahl;
+
+                // Nur die Kachel neu, nicht die ganze Leiste: Ein Neuzeichnen
+                // mitten im Umbenennen eines Merkzettels naehme dem Menschen
+                // das Eingabefeld unter den Fingern weg.
+                const alteKachel = this.leiste?.querySelector('.postfach');
+
+                if (alteKachel) {
+                    alteKachel.outerHTML = this.postfachKnopf();
+                }
+            } catch (fehler) {
+                // Die Leiste ist Beiwerk. Ein Zaehler, der nicht kommt, darf
+                // keine Fehlermeldung in die Konsole jeder Seite schreiben.
+            }
         }
 
         /**
@@ -1111,6 +1243,42 @@
     .knopf.ist-hier .kachel { background: var(--rand); }
     .knopf.ist-hier .kachel img { opacity: 1; }
     .knopf.ist-hier:hover .kachel { transform: none; }
+
+    /*
+     * Das Postfach sieht aus wie ein System — gleiche Kachel, gleiche Groesse
+     * —, hat aber kein Logo, sondern ein gezeichnetes Symbol. Es steht links
+     * und gehoert damit sichtbar zur Leiste und nicht zu den Merkzetteln.
+     */
+    .postfach-kachel svg { opacity: 0.62; transition: opacity 140ms ease; }
+    .knopf.postfach:hover .postfach-kachel svg,
+    .knopf.postfach:focus-visible .postfach-kachel svg { opacity: 1; }
+
+    /*
+     * Das Abzeichen sitzt AUF der Kachel und nicht daneben: Die Leiste ist
+     * schmal, und eine Zahl daneben verschoebe alles Folgende, sobald sie
+     * zweistellig wird.
+     */
+    .postfach-zahl {
+        position: absolute;
+        top: -3px;
+        right: -3px;
+        min-width: 17px;
+        height: 17px;
+        padding: 0 4px;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9px;
+        background: #dc2626;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        /* Ein Rand in der Grundfarbe setzt das Abzeichen von der Kachel ab,
+           auch wenn beide dunkel sind. */
+        box-shadow: 0 0 0 2px var(--grund);
+    }
 
     /* Trennt Systeme von Merkzetteln. Links steht, was das Verzeichnis
        bestimmt; rechts, was man sich selbst abgelegt hat. */
