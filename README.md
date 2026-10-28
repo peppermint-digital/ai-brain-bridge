@@ -192,6 +192,95 @@ Solange das alte Paket installiert ist, **tritt dieses hier zurück** und meldet
 nichts. So kann jedes Produkt zu seinem eigenen Deploy umsteigen, ohne dass die
 Meldung zwischenzeitlich doppelt läuft.
 
+## Rechte zentral — Rollen und Zuständigkeiten aus AI Brain
+
+Alle Rechte einer Person in einem Produkt werden in AI Brain gesetzt. Das Produkt
+meldet, was es zu vergeben hat, und setzt es auf Zuruf; die Riegel bleiben hier.
+
+**Rollen** (AI Brain #5245/#5314) — `ListRolesTool` + `AssignRoleTool` am
+MCP-Server registrieren. Ohne eigenen Resolver liest `RoleCatalog` die Rollen von
+`spatie/laravel-permission`.
+
+**Zuständigkeiten** (#9007) — das, woran jemand arbeitet: im CRM Mandant und
+darunter Bereich. Zwei Werkzeuge, zwei Resolver, keine Vorgabe:
+
+```php
+// MCP-Server des Produkts
+protected array $tools = [
+    \Peppermint\AiBrainBridge\Mcp\Tools\ListScopesTool::class,
+    \Peppermint\AiBrainBridge\Mcp\Tools\AssignScopeTool::class,
+];
+
+// ServiceProvider
+ScopeCatalog::resolveUsing(fn () => [
+    ['schluessel' => 'mandant', 'beschriftung' => 'Mandant',
+     'alle_moeglich' => true, 'alle_beschriftung' => 'Alle Mandanten',
+     'werte' => [['id' => '3', 'label' => 'Schülerferienpass']]],
+    ['schluessel' => 'bereich', 'beschriftung' => 'Bereich', 'eltern' => 'mandant',
+     'werte' => [['id' => '12', 'label' => 'NRW', 'eltern_id' => '3']]],
+]);
+
+ScopeCatalog::resolvePersonUsing(fn (string $email) => [
+    'zugewiesen' => ['mandant' => [3], 'bereich' => [12]],
+    'alle' => ['mandant' => false],
+]);
+
+ScopeAssignment::handleUsing(function (string $email, string $ebene, array $ids, ?bool $alle) {
+    // Hier liegen die Riegel: Gehoert der Bereich zu einem zugewiesenen
+    // Mandanten? Ist der Mandant noch aktiv? AI Brain weiss das nur aus
+    // zweiter Hand.
+    return ['ok' => true, 'message' => 'Bereiche gesetzt.', 'zugewiesen' => [...], 'alle' => [...]];
+});
+```
+
+`ids` trägt immer die **vollständige** Liste einer Ebene — wie `sync()`. Eine
+leere Liste entzieht; es gibt bewusst kein zuweisen/entziehen wie bei Rollen.
+
+**Ohne Resolver gibt es die Fähigkeit nicht.** Ein Produkt ohne
+Zuständigkeiten meldet eine leere Ebenenliste, und in AI Brain erscheint nichts.
+Der Schalter ist die Registrierung.
+
+## Nutzerverwaltung: zentral ODER lokal, nie beides
+
+Ist das Produkt an AI Brain angebunden, werden Konten, Rollen, Mandanten und
+Bereiche **dort** vergeben — die lokale Maske zeigt nur noch, was gilt.
+
+```env
+# auto (Vorgabe): angebunden => brain, sonst lokal
+AI_BRAIN_USER_ADMIN=auto
+```
+
+Die Vorgabe ergibt sich aus der Anbindung und nicht aus einer Zeile je Site:
+Vergisst man sie bei einem Produkt, bliebe dort unbemerkt eine zweite Wahrheit
+über dieselben Rechte stehen. Anders als beim Anmelde-Riegel sperrt hier nichts
+aus — es verschiebt nur, WO man die Rechte setzt.
+
+Das Produkt hängt den Riegel an seine Verwaltungsroute (Lesen bleibt offen):
+
+```php
+Route::resource('users', UserController::class)->middleware('ai-brain.user-admin');
+```
+
+Und noch einmal in der Policy, denn ein Riegel vor der Tür sagt nichts über die
+Fenster:
+
+```php
+public function create(User $nutzer): bool
+{
+    return Nutzerverwaltung::lokal() && $nutzer->isAdmin();
+}
+```
+
+Für die Oberfläche: `Nutzerverwaltung::fuerOberflaeche()` liefert `zentral`,
+`modus`, `url` und einen Hinweissatz — als geteilte Inertia-Prop oder
+View-Variable.
+
+**Nicht betroffen:** der Notzugang (`AI_BRAIN_LOCAL_LOGIN`), das eigene Profil
+und die Mitarbeiterdaten des Managers (Urlaub, Stundenlisten, Personalstamm,
+Offboarding). Die Grenze ist nicht „hängt an einem Nutzer", sondern
+„entscheidet, wer was darf oder sieht". Wo beides auf derselben Route liegt,
+läuft der Schnitt über die Felder statt über den Weg.
+
 ## Umschaltleiste zwischen den Systemen
 
 Ein Griff am oberen Bildschirmrand: Maus dagegen, und die Systeme fahren aus, in

@@ -104,6 +104,31 @@ return [
     ],
 
     /*
+    | WO die Nutzerverwaltung laeuft (AI Brain #9007).
+    |
+    | Bastian am 28.10.2026: „Wenn das AI-Brain aktiviert ist, muss die
+    | Nutzerverwaltung im jeweiligen System ja deaktiviert sein."
+    |
+    | 'auto'  — VORGABE: angebunden (client_id + secret vorhanden) => 'brain',
+    |           sonst 'lokal'. Es gibt damit nichts je Forge-Site nachzutragen,
+    |           und kein Produkt bleibt unbemerkt auf der zweiten Wahrheit
+    |           stehen, weil jemand eine Zeile vergessen hat.
+    | 'brain' — Konten, Rollen, Mandanten und Bereiche werden hier nur noch
+    |           ANGEZEIGT. Jeder schreibende Weg ist zu, auch per Route.
+    | 'lokal' — wie bisher, trotz Anbindung.
+    |
+    | Anders als beim Anmelde-Riegel darf die Vorgabe hier zufassen: Ein
+    | zugesperrter Login sperrt aus, ein zugesperrtes Rechteformular verschiebt
+    | nur, WO man die Rechte setzt — naemlich dorthin, wo man ohnehin ist.
+    |
+    | NICHT betroffen: der Notzugang (AI_BRAIN_LOCAL_LOGIN), das eigene Profil
+    | und die Mitarbeiterdaten des Managers (Urlaub, Stunden, Personalstamm,
+    | Offboarding). Die Grenze ist nicht „haengt an einem Nutzer", sondern
+    | „entscheidet, wer was darf oder sieht".
+    */
+    'user_admin' => env('AI_BRAIN_USER_ADMIN', 'auto'),
+
+    /*
     | Umschaltleiste zwischen den Peppermint-Systemen (AI Brain #5281).
     |
     | Ein Griff am oberen Bildschirmrand, hinter dem die Systeme liegen, in die

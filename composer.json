@@ -51,7 +51,7 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "suggest": {
-        "laravel/mcp": "Wird gebraucht, wenn das Produkt das mitgelieferte ListRolesTool an seinem MCP-Server registriert (AI Brain #5245).",
+        "laravel/mcp": "Wird gebraucht, wenn das Produkt die mitgelieferten Werkzeuge an seinem MCP-Server registriert — ListRolesTool/AssignRoleTool (AI Brain #5245/#5314), ListScopesTool/AssignScopeTool (#9007).",
         "spatie/laravel-permission": "Ohne eigenen Resolver liest der RoleCatalog die Rollen von dort."
     }
 }

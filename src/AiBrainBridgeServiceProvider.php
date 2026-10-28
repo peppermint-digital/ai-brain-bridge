@@ -29,6 +29,7 @@ use Peppermint\AiBrainBridge\Http\Controllers\ConnectController;
 use Peppermint\AiBrainBridge\Http\Controllers\InboundEventController;
 use Peppermint\AiBrainBridge\Http\Controllers\SwitcherController;
 use Peppermint\AiBrainBridge\Http\Middleware\LokalerLoginRiegel;
+use Peppermint\AiBrainBridge\Http\Middleware\NutzerverwaltungRiegel;
 use Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser;
 use Peppermint\AiBrainBridge\Http\Middleware\VerifyAiBrainSignature;
 
@@ -112,6 +113,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         }
 
         $this->registerLokalenLoginRiegel();
+        $this->registerNutzerverwaltungRiegel();
         $this->registerSitzungsEntzug();
         $this->registerInboundRoute();
         $this->registerConnectRoute();
@@ -310,6 +312,29 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         $this->app['router']->aliasMiddleware(
             'ai-brain.local-login',
             LokalerLoginRiegel::class,
+        );
+    }
+
+    /**
+     * Den Riegel vor der lokalen Nutzerverwaltung bereitstellen (AI Brain #9007).
+     *
+     * Wieder nur ein KUERZEL, aus denselben zwei Gruenden wie beim
+     * Anmelde-Riegel: Es betrifft wenige Routen, und ein Paket, das sich still
+     * in die Middleware-Kette haengt, laesst spaeter niemanden finden, warum
+     * ein Speichern abgewiesen wird. Das Produkt haengt es an seine
+     * Verwaltungsroute:
+     *
+     *     Route::resource('users', UserController::class)
+     *         ->middleware('ai-brain.user-admin');
+     *
+     * Ob er zufasst, entscheidet {@see \Peppermint\AiBrainBridge\Auth\Nutzerverwaltung}
+     * — angebunden heisst zentral, und dann ist jeder schreibende Zugriff zu.
+     */
+    protected function registerNutzerverwaltungRiegel(): void
+    {
+        $this->app['router']->aliasMiddleware(
+            'ai-brain.user-admin',
+            NutzerverwaltungRiegel::class,
         );
     }
 
