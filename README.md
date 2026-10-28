@@ -278,8 +278,21 @@ View-Variable.
 **Nicht betroffen:** der Notzugang (`AI_BRAIN_LOCAL_LOGIN`), das eigene Profil
 und die Mitarbeiterdaten des Managers (Urlaub, Stundenlisten, Personalstamm,
 Offboarding). Die Grenze ist nicht „hängt an einem Nutzer", sondern
-„entscheidet, wer was darf oder sieht". Wo beides auf derselben Route liegt,
-läuft der Schnitt über die Felder statt über den Weg.
+„entscheidet, wer was darf oder sieht".
+
+Wo beides auf **derselben Route** liegt — im Manager trägt `admin/users/{user}`
+die Rolle *und* den Urlaubsanspruch —, läuft der Schnitt über die Felder:
+
+```php
+[$validated, $entfernt] = Nutzerverwaltung::ohneRechtefelder($validated, [
+    'name', 'email', 'password', 'role', 'is_active',
+]);
+
+// Still weglassen waere die schlechteste Rueckmeldung von allen.
+if ($entfernt !== []) {
+    session()->flash('warning', Nutzerverwaltung::abweisung());
+}
+```
 
 ## Umschaltleiste zwischen den Systemen
 

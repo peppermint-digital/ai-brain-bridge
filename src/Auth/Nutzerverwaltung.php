@@ -142,6 +142,60 @@ class Nutzerverwaltung
     }
 
     /**
+     * Die Rechtefelder aus einem Datensatz nehmen, wenn zentral verwaltet wird.
+     *
+     * ## Wofür es das gibt
+     *
+     * Im Manager liegen Rechte und Mitarbeiterdaten auf DERSELBEN Maske und
+     * derselben Route: `admin/users/{user}` trägt die Rolle **und** den
+     * Urlaubsanspruch, den Stundensatz, die Wochenstunden, das Eintrittsdatum.
+     * Ein Riegel, der dort pauschal zusperrte, nähme der Personalverwaltung
+     * ihre Arbeit weg — und die hat mit Rechten nichts zu tun.
+     *
+     * Deshalb läuft der Schnitt dort über die Felder statt über den Weg. Die
+     * Grenze ist nicht „hängt an einem Nutzer", sondern „entscheidet, wer was
+     * darf oder sieht":
+     *
+     * | zentral (AI Brain) | bleibt im Manager |
+     * |---|---|
+     * | Konto vorhanden, Anmeldung erlaubt | Urlaubsanspruch, Resttage |
+     * | Rolle | Stundenlisten, Zeiteinträge |
+     * | Name, Adresse, Passwort | Personalstamm, Eintrittsdatum |
+     * | Mandant, Bereich (wo es sie gibt) | Offboarding, Anonymisierung |
+     *
+     * Die rechte Spalte hängt an einem Konto, ist aber kein Recht. Sie bleibt,
+     * wo sie ist — das ist der Sinn des Identity Mappings (Memory #2184): Die
+     * Anmeldung wird von den Mitarbeiterdaten entkoppelt, nicht umgekehrt.
+     *
+     * ## Still weglassen wäre falsch
+     *
+     * Deshalb kommt zurück, WAS weggelassen wurde. Wer eine Rolle ändern
+     * wollte und „gespeichert" liest, ohne dass sie sich geändert hat, hat die
+     * schlechteste Rückmeldung von allen bekommen.
+     *
+     * @param  array<string, mixed>  $daten
+     * @param  list<string>  $rechtefelder
+     * @return array{0: array<string, mixed>, 1: list<string>}
+     */
+    public static function ohneRechtefelder(array $daten, array $rechtefelder): array
+    {
+        if (static::lokal()) {
+            return [$daten, []];
+        }
+
+        $entfernt = [];
+
+        foreach ($rechtefelder as $feld) {
+            if (array_key_exists($feld, $daten)) {
+                $entfernt[] = $feld;
+                unset($daten[$feld]);
+            }
+        }
+
+        return [$daten, $entfernt];
+    }
+
+    /**
      * Die Meldung für einen abgewiesenen schreibenden Zugriff.
      *
      * Sichtbar machen, nicht nur verweigern — dieselbe Haltung wie beim

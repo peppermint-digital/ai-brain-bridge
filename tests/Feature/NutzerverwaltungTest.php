@@ -99,3 +99,33 @@ it('laesst das Schreiben durch, solange die Verwaltung lokal ist', function () {
     // sonst koennte dort niemand mehr Rechte vergeben.
     $this->put('/test-nutzer')->assertOk()->assertSee('gespeichert');
 });
+
+it('nimmt die Rechtefelder heraus und sagt, welche — der Manager-Fall', function () {
+    config()->set('ai-brain-bridge.user_admin', 'brain');
+
+    // Im Manager liegen Rolle und Urlaubsanspruch auf DERSELBEN Route. Ein
+    // pauschaler Riegel haette der Personalverwaltung ihre Arbeit weggenommen.
+    [$gefiltert, $entfernt] = Nutzerverwaltung::ohneRechtefelder([
+        'name' => 'Neu',
+        'role' => 'administrator',
+        'annual_vacation_days' => 30,
+        'weekly_hours' => 40,
+    ], ['name', 'email', 'role', 'password']);
+
+    expect($gefiltert)->toBe(['annual_vacation_days' => 30, 'weekly_hours' => 40]);
+    // Still weglassen waere die schlechteste Rueckmeldung von allen: „gespeichert"
+    // lesen und die Rolle hat sich nicht geaendert.
+    expect($entfernt)->toBe(['name', 'role']);
+});
+
+it('laesst lokal jedes Feld stehen', function () {
+    config()->set('ai-brain-bridge.user_admin', 'lokal');
+
+    [$gefiltert, $entfernt] = Nutzerverwaltung::ohneRechtefelder(
+        ['role' => 'administrator'],
+        ['role'],
+    );
+
+    expect($gefiltert)->toBe(['role' => 'administrator']);
+    expect($entfernt)->toBe([]);
+});
