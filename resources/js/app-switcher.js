@@ -34,7 +34,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.8.0';
+    const VERSION = '1.9.0';
 
     /**
      * Die Symbole, die ein Merkzettel tragen kann (#5320).
@@ -410,8 +410,13 @@
                 ? `<span class="postfach-zahl">${this.sicher(text)}</span>`
                 : '';
 
+            // „in allen Systemen" gehoert dazu (AI Brain #1152): Die Zahl
+            // ist der Bestand ueber alle Arten und Systeme, die Reiter auf
+            // der Seite dahinter zeigen die Liste. Am 29.10.2026 stand 4623
+            // hier gegen Reiter mit 9/29/50/112/50, und das las sich als
+            // Widerspruch. Derselbe Satz steht am Symbol in der Kopfzeile.
             const beschriftung = ungelesen > 0
-                ? `Posteingang, ${ungelesen} ungelesen`
+                ? `Posteingang, ${ungelesen} ungelesen in allen Systemen`
                 : 'Posteingang';
 
             return `
