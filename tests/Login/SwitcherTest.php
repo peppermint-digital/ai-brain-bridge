@@ -195,7 +195,13 @@ it('schreibt kein Postfach ins Layout, wenn das Produkt keinen Posteingang hat',
     expect(app(SwitcherController::class)->markup())->not->toContain('postfach=');
 });
 
-it('schreibt das Postfach ins Layout, sobald beide Routen stehen', function () {
+it('faellt auf die Meldungsseite zurueck, wenn es keinen gemeinsamen Posteingang gibt', function () {
+    // Der Rueckfall, nicht der Normalfall (AI Brain #1152). Ein Produkt
+    // ohne peppermint/inbox hat keine gemeinsame Seite — und ein Symbol auf
+    // einen 404 ist schlimmer als keines.
+    //
+    // Derselbe Zweig traegt das Ausrollfenster: Zwischen dem Ziehen dieses
+    // Pakets und dem Ziehen des Inbox-Pakets soll die Kachel stehenbleiben.
     Route::get('notifications/inbox', fn () => '')->name('notifications.inbox');
     Route::get('api/inbox/unread-count', fn () => '')->name('inbox.api.unread-count');
 
@@ -207,10 +213,53 @@ it('schreibt das Postfach ins Layout, sobald beide Routen stehen', function () {
         ->and($markup)->toContain('postfach-zaehler="http://localhost/api/inbox/unread-count"');
 });
 
-it('verlangt BEIDE Routen', function () {
-    // Nur die Seite ohne den Zaehler ergaebe eine Kachel, die nie ein
-    // Abzeichen bekommt — und damit aussieht, als waere nie etwas da.
+it('zeigt auf den GEMEINSAMEN Posteingang, sobald es ihn gibt', function () {
+    /*
+     * Der eigentliche Punkt von #1152. Bis zum 29.10.2026 stand hier fest
+     * `notifications.inbox` — die Kachel fuehrte auf einen Ausschnitt,
+     * waehrend das Symbol in der Kopfzeile desselben Produkts auf den
+     * gemeinsamen Posteingang ging. Zwei Briefkaesten, verschiedener
+     * Inhalt, dieselbe Kopfzeile.
+     *
+     * Die Meldungsseite steht hier MIT in der Liste: Sie darf nicht
+     * gewinnen, bloss weil sie auch da ist.
+     */
     Route::get('notifications/inbox', fn () => '')->name('notifications.inbox');
+    Route::get('api/inbox/unread-count', fn () => '')->name('inbox.api.unread-count');
+    Route::get('posteingang', fn () => '')->name('posteingang');
+    Route::get('posteingang/ungelesen', fn () => '')->name('inbox.ungelesen');
+
+    $this->actingAs($this->person);
+
+    $markup = app(SwitcherController::class)->markup();
+
+    expect($markup)->toContain('postfach="http://localhost/posteingang"')
+        // Und die GLOBALE Zahl: Die alte zaehlt nur die Meldungen dieses
+        // einen Systems und spraeche damit ueber etwas anderes als die
+        // Seite, die sie aufmacht.
+        ->and($markup)->toContain('postfach-zaehler="http://localhost/posteingang/ungelesen"');
+});
+
+it('nimmt die gemeinsame Seite auch mit der alten Zahl, wenn die neue noch fehlt', function () {
+    // Die Luecke beim Ausrollen, andere Richtung: Das Produkt hat den
+    // gemeinsamen Posteingang schon, das Inbox-Paket aber noch nicht die
+    // Zahl dazu. Dann ist die Seite richtig und die Zahl das Beste, was es
+    // gibt — eine Kachel ohne Zahl saehe aus wie „nichts Neues".
+    Route::get('posteingang', fn () => '')->name('posteingang');
+    Route::get('api/inbox/unread-count', fn () => '')->name('inbox.api.unread-count');
+
+    $this->actingAs($this->person);
+
+    $markup = app(SwitcherController::class)->markup();
+
+    expect($markup)->toContain('postfach="http://localhost/posteingang"')
+        ->and($markup)->toContain('postfach-zaehler="http://localhost/api/inbox/unread-count"');
+});
+
+it('verlangt eine Seite UND eine Zahl', function () {
+    // Nur die Seite ohne einen Zaehler ergaebe eine Kachel, die nie ein
+    // Abzeichen bekommt — und damit aussieht, als waere nie etwas da.
+    Route::get('posteingang', fn () => '')->name('posteingang');
 
     $this->actingAs($this->person);
 

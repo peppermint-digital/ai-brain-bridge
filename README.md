@@ -325,6 +325,31 @@ bestimmt das Zielprodukt ueber `AI_BRAIN_LOGIN_AFTER` — nicht AI Brain.
 **Wenn AI Brain ausfaellt**, erscheint keine Leiste. Sie ist Beiwerk und darf nie
 der Grund sein, dass eine Seite nicht laedt.
 
+### Die Postfach-Kachel
+
+In der Leiste sitzt eine Kachel mit der Zahl des Posteingangs. Sie erscheint
+nur, wenn das Produkt eine Posteingangs-Seite **und** eine Zahl dazu
+registriert hat — ein Symbol, das auf einen 404 führt, ist schlimmer als
+keines. Dieselbe Frage beantwortet `SwitcherController::zeigtPostfach()` dem
+Produkt, das seine eigene Glocke genau dann weglässt.
+
+Gewählt wird in dieser Reihenfolge:
+
+| | Seite | Zahl |
+|---|---|---|
+| **1. Vorzug** | `posteingang` — der gemeinsame Posteingang | `inbox.ungelesen` — global, alle Arten und Systeme |
+| **2. Rückfall** | `notifications.inbox` — die produkteigene Meldungsseite | `inbox.api.unread-count` — nur die Meldungen dieses Systems |
+
+Bis zum 29.10.2026 stand hier fest der Rückfall. Die Kachel führte damit auf
+einen Ausschnitt, während das Posteingangs-Symbol in der Kopfzeile desselben
+Produkts auf den gemeinsamen Posteingang ging: zwei Briefkästen mit
+verschiedenem Inhalt in derselben Kopfzeile (AI Brain #1152).
+
+Der Rückfall bleibt aus zwei Gründen: Ein Produkt ohne `peppermint/inbox` hat
+keine gemeinsame Seite — und zwischen dem Ziehen dieses Pakets und dem Ziehen
+des Inbox-Pakets liegt in jedem Produkt eine Lücke, in der die Kachel
+stehenbleiben soll statt zu verschwinden.
+
 ### Landet man auf der richtigen Seite?
 
 Zeigt `/` im Produkt eine Willkommensseite, landet man beim Umschalten dort —

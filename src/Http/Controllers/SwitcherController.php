@@ -265,15 +265,84 @@ class SwitcherController
      * Posteingangs-Seite. Ein Symbol, das dort auf einen 404 fuehrt, ist
      * schlimmer als keines — also erscheint es nur, wenn beide Routen
      * wirklich registriert sind.
+     *
+     * Welche Routen das sind, entscheiden {@see postfachSeite()} und
+     * {@see postfachZaehler()}: der gemeinsame Posteingang, wenn es ihn
+     * gibt, sonst die Meldungsseite (AI Brain #1152).
      */
     protected function postfach(): string
     {
-        if (! self::zeigtPostfach()) {
+        $seite = self::postfachSeite();
+
+        if ($seite === null || ! self::zeigtPostfach()) {
             return '';
         }
 
-        return ' postfach="'.e(route('notifications.inbox')).'"'
-            .' postfach-zaehler="'.e(route('inbox.api.unread-count')).'"';
+        return ' postfach="'.e(route($seite)).'"'
+            .' postfach-zaehler="'.e(route(self::postfachZaehler())).'"';
+    }
+
+    /**
+     * Welche Seite hinter der Kachel liegt (AI Brain #1152).
+     *
+     * ## Was hier bis zum 29.10.2026 stand
+     *
+     * Fest `notifications.inbox` — die produkteigene Meldungsseite. Das war
+     * richtig, als es die gemeinsame Seite noch nicht gab.
+     *
+     * Seit es sie gibt, zeigte die Kachel auf einen Ausschnitt, waehrend das
+     * Posteingangs-Symbol in der Kopfzeile desselben Produkts auf den
+     * gemeinsamen Posteingang fuehrte. Zwei Briefkaesten mit verschiedenem
+     * Inhalt, in derselben Kopfzeile. Bastian dazu: „da ist der Posteingang
+     * irgendwie noch ein anderer … Der Richtige ist der, der jetzt in den
+     * Einzelsystemen angezeigt wird."
+     *
+     * ## Die Reihenfolge ist die Aussage
+     *
+     * Der gemeinsame Posteingang gewinnt. Die Meldungsseite bleibt als
+     * RUECKFALL — nicht aus Nachsicht, sondern weil ein Produkt ohne
+     * `peppermint/inbox` keine gemeinsame Seite hat, und ein Symbol auf
+     * einen 404 schlimmer ist als keines.
+     *
+     * Dieser Rueckfall traegt ausserdem das Ausrollfenster: Zwischen dem
+     * Ziehen dieses Pakets und dem Ziehen des Inbox-Pakets liegt in jedem
+     * Produkt eine Luecke, und darin soll die Kachel stehenbleiben und
+     * nicht verschwinden.
+     */
+    protected static function postfachSeite(): ?string
+    {
+        foreach (['posteingang', 'notifications.inbox'] as $name) {
+            if (Route::has($name)) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Woher die Zahl an der Kachel kommt (AI Brain #1152).
+     *
+     * `inbox.ungelesen` aus `peppermint/inbox` nennt den GLOBALEN Bestand —
+     * alle Arten, alle Systeme, also das, was hinter der Kachel steht.
+     *
+     * `inbox.api.unread-count` ist der Rueckfall und zaehlt nur die
+     * ungelesenen Meldungen DIESES Systems. Er stand hier allein, und damit
+     * sprach die Zahl ueber etwas anderes als die Seite, die sie aufmacht.
+     * Er bleibt, weil er in der Luecke beim Ausrollen die einzige Zahl ist,
+     * die es gibt — eine Kachel ohne Zahl saehe aus wie „nichts Neues".
+     */
+    protected static function postfachZaehler(): string
+    {
+        foreach (['inbox.ungelesen', 'inbox.api.unread-count'] as $name) {
+            if (Route::has($name)) {
+                return $name;
+            }
+        }
+
+        // Unerreichbar, solange `zeigtPostfach()` beide Namen prueft. Steht
+        // hier, damit `route(null)` nicht erst in Produktion auffaellt.
+        return 'inbox.api.unread-count';
     }
 
     /**
@@ -291,8 +360,8 @@ class SwitcherController
     {
         return (bool) config('ai-brain-bridge.switcher.enabled')
             && (bool) config('ai-brain-bridge.login.enabled')
-            && Route::has('notifications.inbox')
-            && Route::has('inbox.api.unread-count');
+            && self::postfachSeite() !== null
+            && (Route::has('inbox.ungelesen') || Route::has('inbox.api.unread-count'));
     }
 
     /**
