@@ -286,3 +286,45 @@ it('beantwortet dieselbe Frage fuer das Produkt wie fuer die Leiste', function (
 
     expect(SwitcherController::zeigtPostfach())->toBeFalse();
 });
+
+/**
+ * Der Telefon-Platz der Leiste (AI Brain #1208).
+ *
+ * Die Geometrie selbst ist im Browser gemessen (31.10.2026, 390 x 844) und
+ * laesst sich hier nicht nachmessen — es gibt kein Layout in einem PHP-Test.
+ * Was dieser Test festhaelt, ist deshalb nicht das Ergebnis, sondern die
+ * Entscheidung: dass es den Mobil-Block ueberhaupt gibt, dass der Griff dort
+ * ein 44-px-Ziel ist und dass die Leiste unten LINKS haengt.
+ *
+ * Ohne diesen Riegel waere der Befund eine Notiz: Die Datei ist 1500 Zeilen
+ * lang, und ein Umbau am Aussehen nimmt den Block mit, ohne dass es jemandem
+ * auffaellt, bis wieder ein 56 x 6 px grosser Streifen am oberen Bildrand
+ * klebt.
+ */
+it('haelt den Telefon-Platz der Leiste fest', function () {
+    $quelle = file_get_contents(__DIR__.'/../../resources/js/app-switcher.js');
+
+    expect($quelle)->toContain('@media (max-width: 767px)');
+
+    // Bis zum naechsten @media, sonst reichte der Ausschnitt bis zum
+    // Dateiende und ein Treffer koennte aus ganz anderem Code stammen.
+    $start = mb_strpos($quelle, '@media (max-width: 767px)');
+    $ende = mb_strpos($quelle, '@media (prefers-reduced-motion', $start);
+    $mobil = mb_substr($quelle, $start, $ende - $start);
+
+    expect($mobil)->toContain('width: 44px')
+        ->and($mobil)->toContain('height: 44px')
+        // Unten links: `top: auto` loest die obere Kante, `left: 12px` setzt
+        // die linke. Unten rechts ist durch den Verfassen-Knopf des
+        // Mail-Pakets belegt, unten mittig durch die Home-Anzeige von iOS.
+        ->and($mobil)->toContain('top: auto')
+        ->and($mobil)->toContain('left: 12px')
+        ->and($mobil)->toContain('bottom: calc(12px + env(safe-area-inset-bottom, 0px))')
+        // Umbrechen statt herauslaufen — 403 px in einem 390-px-Fenster war
+        // der gemeldete Befund.
+        ->and($mobil)->toContain('flex-wrap: wrap')
+        ->and($mobil)->toContain('max-width: calc(100vw - 24px)')
+        // Ohne das zaehlt die Grenze nur den Inhalt und die Leiste steht
+        // rechts buendig auf der Fensterkante.
+        ->and($mobil)->toContain('box-sizing: border-box');
+});

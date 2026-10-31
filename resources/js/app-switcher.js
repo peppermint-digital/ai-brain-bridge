@@ -34,7 +34,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.9.0';
+    const VERSION = '1.10.0';
 
     /**
      * Die Symbole, die ein Merkzettel tragen kann (#5320).
@@ -1147,9 +1147,17 @@
         padding: 0;
         border-radius: 0 0 7px 7px;
         background: var(--griff);
+        color: var(--gedaempft);
         cursor: pointer;
         transition: width 160ms ease, height 160ms ease, background 160ms ease;
     }
+
+    /* Am Zeigegeraet traegt der Streifen kein Zeichen — er liegt an der
+       Bildkante und wird mit dem Mauszeiger ohne Zielen getroffen. Am
+       Telefon wird aus ihm ein Knopf, und ein Knopf ohne Zeichen ist ein
+       grauer Fleck. Das Zeichen kommt deshalb erst in der Medienabfrage
+       weiter unten zum Vorschein. */
+    .griff svg { display: none; }
 
     .griff:hover,
     .griff:focus-visible {
@@ -1503,6 +1511,98 @@
         transform: translateX(-50%) translateY(0);
     }
 
+    /*
+     * Am Telefon zieht die Leiste nach UNTEN LINKS (AI Brain #1208).
+     *
+     * Gemessen am 31.10.2026 auf 390 x 844: Oben in der Mitte war der Griff
+     * 56 x 6 px gross — unter jedem greifbaren Ziel — und klebte an der
+     * Kante, an der am Geraet die Statusleiste und die Zieh-zum-Neuladen-Geste
+     * des Browsers mitreden. Ausgeklappt mass die Leiste 403 px in einem
+     * 390-px-Fenster; weil der Wirt mittig haengt, lief sie auf BEIDEN Seiten
+     * heraus und die erste Kachel (Postfach) begann bei x = -5.
+     *
+     * Oben Platz zu schaffen geht nicht: Ab y = 14 beginnt in den Produkten
+     * die Symbolreihe der Kopfzeile. Ein 44-px-Ziel dort verdeckte Suche und
+     * Chat. Unten MITTIG geht auch nicht — dort liegt die Home-Anzeige von
+     * iOS samt ihrer Wischgeste. Bleibt unten links; unten rechts ist durch
+     * den runden Verfassen-Knopf des Mail-Pakets belegt.
+     *
+     * Die Grenze ist 767 px und nicht '(pointer: coarse)': Am geteilten
+     * Pruefbrowser meldet die Emulation 'coarse = false' (Wiki „Handy-Nachweis:
+     * Geraete-Emulation haengt am Tab"), eine Abfrage danach waere also genau
+     * dort unpruefbar, wo geprueft wird. Die Breite ist dieselbe Grenze, die
+     * das Layout der Produkte benutzt ('md').
+     */
+    @media (max-width: 767px) {
+        :host {
+            top: auto;
+            left: 12px;
+            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            transform: none;
+        }
+
+        /* 'column-reverse': Der Griff gehoert ans untere Ende, die Leiste
+           waechst ueber ihm auf. Die Reihenfolge im Markup bleibt davon
+           unberuehrt — sie ist die der Tastatur. */
+        .wrap {
+            flex-direction: column-reverse;
+            align-items: flex-start;
+            width: auto;
+            padding-bottom: 0;
+        }
+
+        .griff {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--rand);
+            border-radius: 14px;
+            background: var(--grund);
+            color: var(--schrift);
+            box-shadow: var(--schatten);
+        }
+
+        .griff svg { display: block; }
+
+        /* Die drei Regeln, die den Streifen beim Zeigen und im offenen
+           Zustand wachsen lassen, duerfen hier nicht greifen: Ein Ziel, das
+           seine Groesse aendert, waehrend der Finger daraufliegt, verfehlt
+           man. */
+        .griff:hover,
+        .griff:focus-visible,
+        .wrap.offen .griff {
+            width: 44px;
+            height: 44px;
+            background: var(--grund);
+        }
+
+        .leiste {
+            margin-top: 0;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            /* 12 px Abstand links, 12 px rechts — mehr als das Fenster gibt
+               es nicht, und was darueber hinausgeht, waere abgeschnitten
+               statt scrollbar.
+
+               'box-sizing' gehoert dazu: Ohne es zaehlt die Grenze nur den
+               Inhalt, Polsterung und Rand kommen obendrauf, und die Leiste
+               stand bei der Messung am 31.10.2026 rechts buendig auf 390
+               statt mit Abstand. */
+            box-sizing: border-box;
+            max-width: calc(100vw - 24px);
+            /* Aufklappen von unten statt von oben. */
+            transform: translateY(10px);
+        }
+
+        /* Der Hinweis unter einer Kachel liefe in der untersten Reihe aus dem
+           Bild. Am Telefon traegt jede Kachel ohnehin ihre Beschriftung ueber
+           'aria-label'. */
+        .hinweis { display: none; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
         .griff, .leiste, .kachel, .pin-kachel, .hinweis, .loesen, .umbenennen, .anpinnen, .plus, .symbolknopf { transition: none; }
     }
@@ -1512,7 +1612,11 @@
 </style>
 
 <div class="wrap" hidden>
-    <button class="griff" type="button" aria-label="Anwendung wechseln (Alt+Umschalt+S)"></button>
+    <button class="griff" type="button" aria-label="Anwendung wechseln (Alt+Umschalt+S)">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+            <path d="M5 3h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm10 0h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM5 13h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Zm10 0h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Z"></path>
+        </svg>
+    </button>
     <nav class="leiste" aria-label="Anwendung wechseln" hidden></nav>
 </div>`;
         }
