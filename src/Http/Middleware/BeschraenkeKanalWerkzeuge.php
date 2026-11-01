@@ -53,9 +53,14 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Kein Grant mitgeschickt → dieser Querschnitt tut nichts, in beiden Modi. Das
  * ist Absicht und hat einen eigenen Test: Jeder Aufrufer, der den Grant nicht
- * kennt (die 18 Produkte im Dienst-Modus, jede Oberflaeche, jeder Cron), laeuft
- * bitgenau wie bisher. Erst im Modus `enforce` wird ein Acting-User OHNE Grant
- * abgewiesen — und auch das nur, wenn ein Secret konfiguriert ist.
+ * kennt (die 18 Produkte im Dienst-Modus, jede Oberflaeche, jeder Cron, der
+ * Komm-Layer eines Menschen), laeuft bitgenau wie bisher.
+ *
+ * Beurteilt wird ohne Grant nur, wer sich auf einen KANAL beruft — und das hat
+ * der Melde-Modus am 01.11.2026 selbst erzwungen: Die erste Fassung hielt jeden
+ * Acting-User ohne Grant fuer einen Befund und haette scharf den Komm-Layer
+ * abgewiesen. Zehn Eintraege in wenigen Minuten, alle legitim. Siehe
+ * {@see self::handle()}.
  */
 class BeschraenkeKanalWerkzeuge
 {
@@ -102,16 +107,49 @@ class BeschraenkeKanalWerkzeuge
             return $next($request);
         }
 
-        // Kein Grant und kein Acting-User: ein gewoehnlicher Aufruf, der diesen
-        // Querschnitt nie betraf. Siehe Klassentext.
+        /*
+         * Ohne Grant beurteilt dieser Riegel nur Aufrufe, die sich auf einen
+         * KANAL berufen.
+         *
+         * ## Warum, und was die Messung dazu gesagt hat
+         *
+         * Die erste Fassung behandelte jeden Acting-User ohne Grant als Befund.
+         * Der Melde-Modus hat das am 01.11.2026 binnen Minuten widerlegt: zehn
+         * Eintraege, alle von legitimen Aufrufen — der Faehigkeiten-Lauf und
+         * der Komm-Layer, als Mensch, auf LESENDE Werkzeuge
+         * (`list-calendar-events-tool`, `list-notifications-tool`, …). Scharf
+         * gestellt haette diese Fassung den Komm-Layer abgewiesen.
+         *
+         * Richtig ist deshalb: Ein Aufruf, der keinen Kanal behauptet, ist kein
+         * Kanal-Aufruf. Was ein Mensch ueber den Komm-Layer darf, entscheidet
+         * dort die Faehigkeitsliste und hier die Policy — nicht dieser Riegel.
+         *
+         * ## Die Grenze, die dazugehoert
+         *
+         * Wer den Kanal WEGLAESST und keinen Grant mitschickt, wird hier nicht
+         * beurteilt. Fuer den Weg, um den es geht, ist das kein Loch: Der
+         * MCP-Klient eines Agenten schickt beides, weil der Aufrufer es so baut.
+         * Ein Agent, der den Weg daneben nimmt (eigener Aufruf mit dem
+         * Nachweis aus seiner Umgebung) kann den Kanal auslassen — das bleibt
+         * AI-Brain-Bug #1229, und es schliesst sich erst, wenn JEDER
+         * Acting-User-Aufruf einen Grant traegt.
+         */
         $actingUser = trim((string) $request->header(ResolveAiBrainActingUser::ACTING_USER_HEADER, ''));
+        $behaupteterKanal = trim((string) $request->header(ResolveAiBrainActingUser::CHANNEL_HEADER, ''));
 
-        if ($grant === null && $actingUser === '') {
+        /*
+         * Ein VORGELEGTER, aber ungueltiger Grant ist immer ein Befund —
+         * manipuliert, abgelaufen, mit fremdem Secht signiert. Sonst entkaeme
+         * eine Faelschung, indem sie die Kanal-Kopfzeile weglaesst.
+         */
+        $vorgelegt = ($grund['vorgelegt'] ?? 'nein') === 'ja';
+
+        if ($grant === null && ! $vorgelegt && ($actingUser === '' || $behaupteterKanal === '')) {
             return $next($request);
         }
 
         if ($grant === null) {
-            return $this->ohneGrant($request, $next, $modus, $werkzeug, $actingUser, $grund);
+            return $this->ohneGrant($request, $next, $modus, $werkzeug, $actingUser, $behaupteterKanal, $grund);
         }
 
         if (! $grant->giltFuerKanal($request->header(ResolveAiBrainActingUser::CHANNEL_HEADER))) {
@@ -158,11 +196,13 @@ class BeschraenkeKanalWerkzeuge
         string $modus,
         string $werkzeug,
         string $actingUser,
+        string $behaupteterKanal,
         array $grund,
     ): Response {
-        return $this->abweisen($request, $next, $modus, 'Acting-User ohne gueltigen Grant', [
+        return $this->abweisen($request, $next, $modus, 'Kanal-Aufruf ohne gueltigen Grant', [
             'werkzeug' => $werkzeug,
             'acting_user' => $actingUser,
+            'kanal' => $behaupteterKanal,
             'grant' => $grund['grund'] ?? 'unbekannt',
         ]);
     }

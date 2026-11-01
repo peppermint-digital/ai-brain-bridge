@@ -129,12 +129,34 @@ it('weist einen Grant ab, der mit einem fremden Secret signiert ist', function (
         ->assertDontSee('durchgelassen');
 });
 
-it('weist im scharfen Modus einen Acting-User OHNE Grant ab', function () {
+it('weist im scharfen Modus einen KANAL-Aufruf ohne Grant ab', function () {
+    // Ein Aufruf, der sich auf einen Kanal beruft, aber keinen Grant trägt:
+    // Entweder schickt die Strecke ihn noch nicht mit, oder jemand hat ihn
+    // weggelassen. Beides gehört abgewiesen, sobald scharf gestellt ist.
     $this->postJson('/_test/mcp', aufruf('create-incoming-invoice-tool'), [
         ResolveAiBrainActingUser::ACTING_USER_HEADER => 'chris@example.test',
+        ResolveAiBrainActingUser::CHANNEL_HEADER => 'beleg-extraktion',
     ])
         ->assertOk()
         ->assertDontSee('durchgelassen');
+});
+
+it('lässt einen Acting-User OHNE Kanal und ohne Grant durch — auch scharf', function () {
+    /*
+     * Der Fall, den der Melde-Modus am 01.11.2026 in der Produktion aufgedeckt
+     * hat: Der Faehigkeiten-Lauf und der Komm-Layer rufen als MENSCH, mit
+     * Acting-User und ohne Grant. Zehn Eintraege in wenigen Minuten, alle
+     * legitim, alle auf lesende Werkzeuge.
+     *
+     * Die erste Fassung dieses Riegels hätte sie scharf abgewiesen — also den
+     * Komm-Layer lahmgelegt. Dieser Test hält die Korrektur fest: Wer keinen
+     * Kanal behauptet, ist kein Kanal-Aufruf.
+     */
+    $this->postJson('/_test/mcp', aufruf('delete-incoming-invoice-tool'), [
+        ResolveAiBrainActingUser::ACTING_USER_HEADER => 'chris@example.test',
+    ])
+        ->assertOk()
+        ->assertSee('durchgelassen');
 });
 
 /*
@@ -207,4 +229,22 @@ it('legt den gepruefften Grant fuer die Anwendung bereit', function () {
     $this->postJson('/_test/grant', aufruf('create-incoming-invoice-tool'), grantHeaders($this->grant))
         ->assertOk()
         ->assertSee('beleg-extraktion');
+});
+
+it('behandelt einen vorgelegten, aber ungueltigen Grant auch OHNE Kanal-Kopfzeile als Befund', function () {
+    /*
+     * Die Gegenprobe zur Verengung der Regel: „Kein Kanal behauptet" lässt
+     * einen Aufruf durch — aber nur, wenn auch kein Grant vorgelegt wurde.
+     * Sonst entkäme eine Fälschung, indem sie die Kopfzeile weglässt.
+     *
+     * Der Unterschied steht als eigene Auskunft im Prüfergebnis (`vorgelegt`)
+     * und nicht als Textvergleich auf den Grund: Beim nächsten neuen Grund
+     * hätte ein Textvergleich eine stille Lücke.
+     */
+    $this->postJson('/_test/mcp', aufruf('create-incoming-invoice-tool'), [
+        BeschraenkeKanalWerkzeuge::GRANT_HEADER => 'nutzlast.sha256=gefaelscht',
+        ResolveAiBrainActingUser::ACTING_USER_HEADER => 'chris@example.test',
+    ])
+        ->assertOk()
+        ->assertDontSee('durchgelassen');
 });

@@ -109,16 +109,32 @@ final class KanalWerkzeugGrant
 
         if ($roh === null || trim($roh) === '') {
             $grund['grund'] = 'kein Grant mitgeschickt';
+            $grund['vorgelegt'] = 'nein';
 
             return null;
         }
 
+        /*
+         * Ab hier hat jemand etwas VORGELEGT. Das ist eine eigene Auskunft und
+         * kein Textvergleich auf den Grund: Ein vorgelegter, aber ungueltiger
+         * Grant ist ein Befund — unabhaengig davon, was sonst in den Kopfzeilen
+         * steht. Wer sonst nach dem Grund-TEXT unterscheiden muesste, haette
+         * beim naechsten neuen Grund eine stille Luecke.
+         */
+        $grund['vorgelegt'] = 'ja';
+
         if ($secret === '') {
-            // Ohne Secret gibt es nichts zu pruefen. Das ist dieselbe
-            // fail-safe-Doktrin wie bei der Signatur des Acting-Users: Eine
-            // frische Installation laeuft ohne Secret-Verteilung — sie hat dann
-            // aber auch diesen Riegel nicht, und der Aufrufer muss es wissen.
+            /*
+             * Ohne Secret gibt es nichts zu pruefen. Das ist dieselbe
+             * fail-safe-Doktrin wie bei der Signatur des Acting-Users: Eine
+             * frische Installation laeuft ohne Secret-Verteilung — sie hat dann
+             * aber auch diesen Riegel nicht, und der Aufrufer muss es wissen.
+             *
+             * Und sie gilt NICHT als vorgelegt: Dass hier kein Geheimnis liegt,
+             * ist ein Zustand dieser Installation und kein Versuch von drueben.
+             */
             $grund['grund'] = 'kein Event-Secret konfiguriert';
+            $grund['vorgelegt'] = 'nein';
 
             return null;
         }
