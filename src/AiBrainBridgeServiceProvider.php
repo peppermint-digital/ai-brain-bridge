@@ -30,6 +30,7 @@ use Peppermint\AiBrainBridge\Http\Controllers\InboundEventController;
 use Peppermint\AiBrainBridge\Http\Controllers\SwitcherController;
 use Peppermint\AiBrainBridge\Http\Middleware\LokalerLoginRiegel;
 use Peppermint\AiBrainBridge\Http\Middleware\NutzerverwaltungRiegel;
+use Peppermint\AiBrainBridge\Http\Middleware\BeschraenkeKanalWerkzeuge;
 use Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser;
 use Peppermint\AiBrainBridge\Http\Middleware\VerifyAiBrainSignature;
 
@@ -103,6 +104,22 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         // Produkts hängen, dann handelt der MCP-Aufruf als der Mensch, der die
         // Nachricht geschrieben hat — statt als Token-Besitzer.
         $this->app['router']->aliasMiddleware('ai-brain.acting-user', ResolveAiBrainActingUser::class);
+
+        /*
+         * Der Werkzeug-Riegel je Channel (AI-Brain-Bug #1226, Aufgabe #9278).
+         *
+         * Hinter `ai-brain.acting-user` haengen, nicht davor: Der Riegel liest
+         * die Acting-Kopfzeile, um „gewoehnlicher Aufruf" von „Channel-Agent
+         * ohne Grant" zu unterscheiden.
+         *
+         *     Route::middleware(['mcp.auth', 'ai-brain.acting-user', 'ai-brain.kanal-werkzeuge'])->…
+         *
+         * Startet in `report` und weist nichts ab — siehe Klassentext.
+         */
+        $this->app['router']->aliasMiddleware(
+            'ai-brain.kanal-werkzeuge',
+            BeschraenkeKanalWerkzeuge::class,
+        );
 
         if ($this->app->runningInConsole()) {
             $this->commands([

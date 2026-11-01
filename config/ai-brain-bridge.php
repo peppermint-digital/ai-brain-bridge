@@ -214,6 +214,28 @@ return [
     /*
     | Events — asynchrone Benachrichtigungen (Schiene 2).
     */
+    /*
+    | Werkzeug-Riegel je AI-Brain-Channel (AI-Brain-Bug #1226, Aufgabe #9278).
+    |
+    | Die per-Channel-Werkzeugauswahl lag bis zum 01.11.2026 nur im Aufrufer und
+    | wirkte dort als `allowedTools` des Claude-SDK — das gibt frei und verbietet
+    | nichts (AI-Brain-Bug #588). Seitdem schickt AI Brain die erlaubte Liste als
+    | signierten Grant mit, und dieser Riegel prueft sie.
+    |
+    | 'report'  — VORGABE: pruefen und protokollieren, NICHTS abweisen. Der
+    |             Startzustand. Erst wenn eine Woche lang kein unerwartetes
+    |             „waere abgewiesen" im Protokoll steht, wird scharfgestellt.
+    | 'enforce' — ein Werkzeug ausserhalb der Liste wird abgewiesen, und ein
+    |             Acting-User ohne gueltigen Grant ebenfalls.
+    | 'off'     — der Querschnitt tut nichts.
+    |
+    | Ohne Grant aendert sich in 'report' und 'off' NICHTS: Jeder Aufrufer, der
+    | ihn nicht kennt, laeuft bitgenau wie bisher.
+    */
+    'kanal_werkzeuge' => [
+        'modus' => env('AI_BRAIN_KANAL_WERKZEUGE', 'report'),
+    ],
+
     'events' => [
         'endpoint' => env('AI_BRAIN_EVENTS_URL'),
         'secret' => env('AI_BRAIN_EVENT_SECRET'),
