@@ -1,5 +1,8 @@
 <?php
 
+use Peppermint\AiBrainBridge\Exceptions\AiBrainBridgeException;
+use Peppermint\AiBrainBridge\Facades\AiBrain;
+use Peppermint\AiBrainBridge\Verbund\Akte;
 use Peppermint\AiBrainBridge\Verbund\Huelle;
 use Peppermint\AiBrainBridge\Verbund\Systemnamen;
 
@@ -64,5 +67,141 @@ describe('Die Systemnamen', function (): void {
         config(['inbox.labels.sources' => ['crm' => 'CRM', 'kaputt' => ['nein'], 7 => 'Zahl']]);
 
         expect(Systemnamen::fremde('inbox'))->toBe(['crm' => 'CRM']);
+    });
+});
+
+/*
+ * ----------------------------------------------------------------------------
+ * Die Akte (#9682)
+ * ----------------------------------------------------------------------------
+ */
+
+describe('Einen Skalar aus der Nutzlast lesen', function (): void {
+    it('findet einen Wert, der keine Liste ist, in jeder Huelle', function (string $huelle): void {
+        $nutzlast = ['kennung' => 'D-10417', 'neu' => true];
+
+        $antwort = $huelle === '' ? $nutzlast : [$huelle => $nutzlast];
+
+        expect(Huelle::wert($antwort, 'kennung'))->toBe('D-10417');
+    })->with(['', 'data', 'structuredContent', 'content', 'result', 'antwort']);
+
+    it('ist noetig, weil schaelen() eine Huelle nur an einer LISTE erkennt', function (): void {
+        // Der Fehlgriff, den dieser Weg verhindert: `schaelen()` prueft
+        // `is_array($kandidat[$erwartet])`. Bei `{"geloest": true}` ist der
+        // Schluessel da, sein Wert aber kein Array — die Huelle kommt leer
+        // zurueck, und der Aufrufer liest `false`, obwohl das Werkzeug
+        // `true` geliefert hat. Eine beruhigende Antwort statt eines Fehlers.
+        expect(Huelle::schaelen(['data' => ['geloest' => true]], 'geloest'))->toBe([]);
+        expect(Huelle::wert(['data' => ['geloest' => true]], 'geloest'))->toBeTrue();
+    });
+
+    it('unterscheidet ein ausdrueckliches null von einem fehlenden Schluessel', function (): void {
+        // `hinweis: null` ist eine Aussage des Werkzeugs („kein Hinweis"),
+        // kein fehlender Schluessel. Mit isset() waere beides dasselbe und
+        // der Ersatzwert haette die Aussage uebertoent.
+        expect(Huelle::wert(['hinweis' => null], 'hinweis', 'ersatz'))->toBeNull();
+        expect(Huelle::wert(['anderes' => 1], 'hinweis', 'ersatz'))->toBe('ersatz');
+    });
+
+    it('nimmt keinen Wert, der eine Liste ist', function (): void {
+        // Listen gehoeren zu schaelen()/zeilen(). Gaebe wert() sie heraus,
+        // haette dieselbe Nutzlast zwei Wege mit zwei Ergebnissen.
+        expect(Huelle::wert(['verweise' => [['art' => 'auftrag']]], 'verweise', 'ersatz'))->toBe('ersatz');
+    });
+});
+
+describe('Die Akte binden und loesen', function (): void {
+    it('nennt dem Brain die eigene Art zuerst und die fremde Herkunft dazu', function (): void {
+        AiBrain::shouldReceive('call')
+            ->once()
+            ->with('dossier-link-tool', [
+                'a_art' => 'auftrag',
+                'a_kennung' => '7',
+                'b_art' => 'projekt',
+                'b_kennung' => '884',
+                'b_system' => 'peppermint-manager',
+            ])
+            ->andReturn(['kennung' => 'D-10417', 'neu' => true, 'verweise' => []]);
+
+        expect(Akte::binden('auftrag', '7', 'projekt', '884', 'peppermint-manager'))
+            ->toBe('D-10417');
+    });
+
+    it('laesst die eigene Herkunft weg — die setzt das Brain aus dem Zugang', function (): void {
+        // Ein System weiss nicht, unter welchem Kuerzel es anderswo gefuehrt
+        // wird (Wiki #595). Duerfte es sich selbst eines geben, stuenden in
+        // drei Oberflaechen drei Woerter fuer dasselbe System.
+        AiBrain::shouldReceive('call')
+            ->once()
+            ->with('dossier-link-tool', Mockery::on(
+                fn (array $argumente): bool => ! array_key_exists('a_system', $argumente)
+            ))
+            ->andReturn(['kennung' => 'D-10417']);
+
+        Akte::binden('auftrag', '7', 'projekt', '884', 'peppermint-manager');
+    });
+
+    it('laesst b_system weg, wenn keines genannt ist, statt null zu senden', function (): void {
+        AiBrain::shouldReceive('call')
+            ->once()
+            ->with('dossier-link-tool', Mockery::on(
+                fn (array $argumente): bool => ! array_key_exists('b_system', $argumente)
+            ))
+            ->andReturn(['kennung' => 'D-10417']);
+
+        Akte::binden('auftrag', '7', 'projekt', '884');
+    });
+
+    it('wirft, wenn die Antwort keine Kennung nennt', function (): void {
+        // Das ist der Punkt, an dem ein stiller Fehlschlag entstehen wuerde:
+        // Gaebe der Helfer hier null zurueck, liesse sich das als „Bruecke
+        // nicht eingerichtet" lesen — und niemand suchte den fehlenden
+        // Verweis.
+        AiBrain::shouldReceive('call')->andReturn(['irgendwas' => 'anderes']);
+
+        expect(fn () => Akte::binden('auftrag', '7', 'projekt', '884'))
+            ->toThrow(AiBrainBridgeException::class);
+    });
+
+    it('gibt den Fehlschlag weiter, statt ihn zu schlucken', function (): void {
+        // Die Wiederholung gehoert in die Warteschlange des Produkts — nur
+        // dort ist bekannt, ob es eine gibt. Ein Helfer, der schluckt, macht
+        // aus einem fehlenden Verweis ein stilles Ereignis.
+        AiBrain::shouldReceive('call')->andThrow(new AiBrainBridgeException('Brain weg'));
+
+        expect(fn () => Akte::binden('auftrag', '7', 'projekt', '884'))
+            ->toThrow(AiBrainBridgeException::class, 'Brain weg');
+    });
+
+    it('loest einen Verweis und liest das Ergebnis als Wahrheitswert', function (): void {
+        AiBrain::shouldReceive('call')
+            ->once()
+            ->with('dossier-unlink-tool', [
+                'art' => 'projekt',
+                'kennung' => '884',
+                'system' => 'peppermint-manager',
+            ])
+            ->andReturn(['geloest' => true, 'akte' => 'D-10417', 'verweise_uebrig' => 1]);
+
+        expect(Akte::loesen('projekt', '884', 'peppermint-manager'))->toBeTrue();
+    });
+
+    it('liest „es gab keinen Verweis" als Aussage, nicht als Fehlschlag', function (): void {
+        AiBrain::shouldReceive('call')
+            ->andReturn(['geloest' => false, 'grund' => 'Zu diesem Datensatz gab es keinen Verweis.']);
+
+        expect(Akte::loesen('projekt', '884'))->toBeFalse();
+    });
+
+    it('sagt frueh und laut ab bei einer Art, die die Akte nicht fuehrt', function (): void {
+        // Belege haengen an ihrem Auftrag, Aufgaben an ihrem oertlichen
+        // Datensatz. Ohne diese Pruefung landet der Fehlertext des Brain in
+        // einem Job-Versuch statt beim Entwickler.
+        AiBrain::shouldReceive('call')->never();
+
+        expect(fn () => Akte::binden('ticket', '25', 'auftrag', '7'))
+            ->toThrow(InvalidArgumentException::class);
+        expect(fn () => Akte::loesen('beleg', 'RE1234'))
+            ->toThrow(InvalidArgumentException::class);
     });
 });

@@ -63,6 +63,47 @@ final class Huelle
     }
 
     /**
+     * EIN Wert aus der Nutzlast, der keine Liste ist — Zeichenkette, Zahl,
+     * Wahrheitswert.
+     *
+     * `schaelen()` findet die Huelle daran, dass der erwartete Schluessel eine
+     * LISTE enthaelt. Antwortet ein Werkzeug mit `{"geloest": true}` oder
+     * `{"kennung": "D-10417"}`, greift das nicht: Der Schluessel ist da, sein
+     * Wert ist aber kein Array — und `schaelen()` gibt eine leere Huelle
+     * zurueck. Wer das nicht weiss, liest `false` bzw. `null`, obwohl das
+     * Werkzeug `true` bzw. eine Kennung geliefert hat.
+     *
+     * Das ist derselbe Fehlgriff wie oben, nur in Skalar: eine beruhigende
+     * Antwort statt eines Fehlers. Deshalb gehoert der Weg hierher und nicht
+     * in jeden Aufrufer.
+     *
+     * @param  array<string, mixed>  $antwort  Die ROHE Antwort, nicht die geschaelte Huelle.
+     * @return mixed Der Wert, oder `$sonst`, wenn keine Huelle ihn fuehrt.
+     */
+    public static function wert(array $antwort, string $schluessel, mixed $sonst = null): mixed
+    {
+        $kandidaten = [
+            $antwort,
+            $antwort['data'] ?? null,
+            $antwort['structuredContent'] ?? null,
+            $antwort['content'] ?? null,
+            $antwort['result'] ?? null,
+            $antwort['antwort'] ?? null,
+        ];
+
+        foreach ($kandidaten as $kandidat) {
+            // array_key_exists, nicht isset: Ein ausdrueckliches `null` ist
+            // eine Aussage des Werkzeugs („kein Hinweis") und nicht dasselbe
+            // wie „diese Huelle fuehrt den Schluessel nicht".
+            if (is_array($kandidat) && array_key_exists($schluessel, $kandidat) && ! is_array($kandidat[$schluessel])) {
+                return $kandidat[$schluessel];
+            }
+        }
+
+        return $sonst;
+    }
+
+    /**
      * Eine Liste von Woertern aus der Nutzlast.
      *
      * @param  array<string, mixed>  $huelle
