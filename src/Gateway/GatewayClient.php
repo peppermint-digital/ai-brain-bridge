@@ -77,8 +77,33 @@ class GatewayClient
             return $this->fehler('tool_failed', 'Unverständliche Antwort von AI Brain (HTTP '.$antwort->status().')');
         }
 
+        // `ok` wird STRENG gelesen, und das ist keine Stilfrage.
+        //
+        // Nur ein echtes `true` gilt. Hier stand bis zum 11.11.2026
+        // `(bool) ($daten['ok'] ?? false)`, und der Fall, den diese Lesart
+        // falsch macht, ist nicht erfunden:
+        //
+        //     ['ok' => 'false', 'data' => null]   // (bool) 'false' === true
+        //
+        // Ein Brain, das so antwortet, gilt als ERFOLG. `data` ist dann keine
+        // Liste, also `null` — und heraus kommt eine leere Antwort, die sich
+        // als vollstaendige Auskunft ausgibt. Dasselbe gilt fuer `1`, `'1'`,
+        // `'yes'` und jedes andere Truthy, das kein Bool ist: Alles davon ist
+        // eine KAPUTTE Antwort, und eine kaputte Antwort ist kein Erfolg.
+        // Streng scheitern kostet eine Fehlermeldung, wo sich ein System
+        // falsch verhaelt; lose scheitern kostet eine falsche Auskunft, die
+        // niemand sieht.
+        //
+        // Diese Stelle sitzt VOR allen vier Produkten — hier entscheidet sich
+        // die Frage, nicht in einem einzelnen Paket. Harmlos war die lose
+        // Lesart nur, weil der Erzeuger ein echtes Bool liefert
+        // (`GatewayResult::$ok` ist `bool`). Wer den eines Tages lockert,
+        // laesst den Fehler sonst an dritter Stelle erscheinen (Bug #1425,
+        // zeichengleich zu `peppermint/tasks` 4f4cf9d und `calendar` 9ec6771).
+        //
+        // Wer das wieder lockern will, muss diese leere Antwort wollen.
         return [
-            'ok' => (bool) ($daten['ok'] ?? false),
+            'ok' => ($daten['ok'] ?? null) === true,
             'data' => is_array($daten['data'] ?? null) ? $daten['data'] : null,
             'text' => $daten['text'] ?? null,
             'error' => $daten['error'] ?? null,

@@ -122,3 +122,43 @@ it('traegt eine ausdruecklich benannte Person mit, wenn niemand angemeldet ist',
             && ! empty($anfrage->header('X-AI-Brain-Acting-Sig')[0] ?? null);
     });
 });
+
+it('liest ein ok, das kein echtes true ist, als Fehlschlag', function (array $koerper, bool $erwartet) {
+    // Die strenge Lesart an der Stelle, die VOR allen vier Produkten sitzt
+    // (Bug #1425).
+    //
+    // Der Fall, um den es geht, ist nicht erfunden: `(bool) 'false'` ist
+    // `true`. Lose gelesen gilt so eine Antwort als Erfolg, `data` ist dann
+    // keine Liste und damit `null` — und heraus kommt eine leere Antwort, die
+    // sich als vollstaendige Auskunft ausgibt. Kein Produkt kann danach noch
+    // streng lesen: Die Bruecke hat das `ok` schon verschluckt.
+    //
+    // Alles Truthy-aber-kein-Bool ist eine KAPUTTE Antwort, und eine kaputte
+    // Antwort ist kein Erfolg. Wer das wieder lockert, will diese leere
+    // Antwort.
+    //
+    // ## Warum jeder Fall ein EIGENER Lauf ist und keine Schleife im Test
+    //
+    // Weil die Schleife nichts gemessen haette: Ein zweites `Http::fake()` im
+    // selben Testkoerper ERSETZT den ersten Stub nicht — der zuerst
+    // registrierte antwortet weiter. Alle Faelle bekaemen die Antwort des
+    // ersten, und der Test waere trotzdem gruen, solange der erste Fall passt.
+    // Gemessen am 11.11.2026, nachdem genau diese Schleife die Gegenprobe
+    // fehlschlagen liess.
+    Http::fake([
+        'brain.test/oauth/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
+        'brain.test/api/v1/gateway' => Http::response($koerper),
+    ]);
+
+    expect(AiBrain::gateway('tasks.list')['ok'])->toBe($erwartet);
+})->with([
+    'ok als String "false"' => [['ok' => 'false', 'data' => null], false],
+    'ok als 1' => [['ok' => 1], false],
+    'ok als String "1"' => [['ok' => '1'], false],
+    'ok als "yes"' => [['ok' => 'yes'], false],
+    // Ein FEHLENDES `ok` zaehlt genauso nicht als Erfolg.
+    'ok fehlt ganz' => [['data' => ['id' => 1]], false],
+    // Gegenprobe, damit der Test nicht bloss „alles ist falsch" prueft: ohne
+    // sie waere er auch unter der alten, losen Lesart gruen.
+    'Gegenprobe: echtes true' => [['ok' => true, 'data' => []], true],
+]);
