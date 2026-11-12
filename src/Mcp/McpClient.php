@@ -17,6 +17,33 @@ use Peppermint\AiBrainBridge\Exceptions\McpAufrufGescheitert;
  * Hinweis v0.1: Der Initialize-Handshake + Session-Header sind hier bewusst
  * schlank gehalten; in P2 gegen den echten laravel/mcp-HTTP-Transport
  * verifizieren (siehe Wiki „Kommunikationslayer v1").
+ *
+ * ## Nicht selbst bauen — der Weg zu einem anderen PRODUKT ist `gateway()`
+ *
+ * @internal Diese Klasse wird von {@see \Peppermint\AiBrainBridge\AiBrainManager::brain()}
+ * gebaut und sonst von niemandem. Sie nimmt eine BELIEBIGE Adresse, und genau
+ * das ist der Grund fuer diesen Hinweis: Wer sie selbst baut, spricht ein
+ * anderes Produkt direkt an — ohne Freigabe in `comm_layer.gateway_grants`
+ * und ohne Fail-closed.
+ *
+ * `AiBrainManager::mcp(string $url)` war die bequeme Form davon und ist am
+ * 12.11.2026 entfallen (Aufgabe #9882, null Aufrufer, gemessen). Der Hinweis
+ * steht deshalb HIER und nicht nur im Wiki: Wer die Abkuerzung wieder bauen
+ * will, kommt an dieser Klasse vorbei, nicht an einem Artikel.
+ *
+ * **Was dieser Hinweis NICHT ist: ein Riegel.** Die Klasse ist nicht `final`,
+ * ihr Konstruktor ist oeffentlich, und `@internal` ist eine Bitte, die kein
+ * Werkzeug erzwingt. Den Konstruktor zu schliessen waere eine brechende
+ * Aenderung an einem veroeffentlichten Paket und ist eine eigene
+ * Entscheidung — sie liegt als Idee vor und gehoert Bastian.
+ *
+ * Die drei Wege, zum Vergleich:
+ *
+ * | Gegenstelle | Weg |
+ * |---|---|
+ * | ein anderes PRODUKT | `AiBrain::gateway('<vorgang>', …, $slug)` |
+ * | die NABE | `AiBrain::call('<werkzeug>')` / `AiBrain::brain()` |
+ * | die AUSSENWELT | direkt, nicht ueber diese Klasse |
  */
 class McpClient
 {

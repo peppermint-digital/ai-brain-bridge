@@ -60,8 +60,10 @@ use Peppermint\AiBrainBridge\Facades\AiBrain;
 $tasks = AiBrain::call('list-tasks-tool', ['project' => 'peppermint-verwaltung']);
 AiBrain::call('create-task-tool', ['project' => '…', 'title' => 'Aus Mail erstellt']);
 
-// Beliebiger MCP-Server (z.B. ein anderes Produkt über den Hub)
-$res = AiBrain::mcp('https://pm.peppermint-digital.com/mcp/peppermint')->callTool('…', [...]);
+// Ein anderes PRODUKT ansprechen? Nicht hier — siehe „Gateway" darunter.
+// Man nennt einen Vorgang, kein Zielsystem, und ohne Freigabe gibt es
+// keinen Weg. `AiBrain::mcp($beliebigeUrl)` gab es bis zum 12.11.2026 und
+// ist entfallen: Es umging genau diese Freigabe (#9882).
 ```
 
 ### Gateway — ein Vorgang bei einem ANDEREN Produkt (K11)

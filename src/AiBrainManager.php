@@ -15,7 +15,20 @@ use Peppermint\AiBrainBridge\Mcp\McpClient;
 
 /**
  * Zentrale Fassade des Bridge-SDK. Kapselt beide Schienen:
- *  - MCP (synchron): call(), brain(), mcp()
+ *  - MCP (synchron): call(), brain()
+ *
+ * `mcp(string $url)` gab es hier bis zum 12.11.2026 — ein MCP-Client fuer eine
+ * BELIEBIGE Adresse. Damit konnte ein Produkt jedes andere direkt ansprechen,
+ * ohne Freigabe in `comm_layer.gateway_grants` und ohne Fail-closed. Gemessen
+ * am 12.11.2026 ueber AI Brain, drei Produkte (app/routes/config/database/
+ * tests, dazu die 24 nanoclaw-Pakete) und die Quellen von acht Paketen: NULL
+ * Aufrufer im Code. Das einzige Vorkommen stand in der README — als Beispiel,
+ * direkt ueber dem Gateway-Abschnitt, der den richtigen Weg lehrt.
+ *
+ * Der Weg zu einem anderen Produkt ist `gateway()`: Man nennt einen Vorgang,
+ * kein Zielsystem, und ohne Freigabe gibt es keinen Weg (Aufgabe #9882). Die
+ * Nabe selbst erreicht ihre angebundenen Produkte ueber ihren EIGENEN
+ * `ProductGateway` und hat `mcp()` nie gebraucht — auch das gemessen.
  *  - Channels (Spezial-MCP): channel()
  *  - Events (async): emit(), on()
  *
@@ -434,14 +447,6 @@ class AiBrainManager
         $url = $this->config['mcp']['brain_url']
             ?: rtrim((string) $this->config['base_url'], '/').'/mcp/brain';
 
-        return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), fn (): array => $this->actingUserHeaders());
-    }
-
-    /**
-     * MCP-Client für eine beliebige URL (z.B. ein Produkt-MCP-Server).
-     */
-    public function mcp(string $url): McpClient
-    {
         return new McpClient($url, $this->tokens, (int) ($this->config['mcp']['timeout'] ?? 30), fn (): array => $this->actingUserHeaders());
     }
 

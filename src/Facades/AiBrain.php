@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Facade;
  * @method static bool actingUserAsserted()
  * @method static ?string inboundChannel()
  * @method static \Peppermint\AiBrainBridge\Mcp\McpClient brain()
- * @method static \Peppermint\AiBrainBridge\Mcp\McpClient mcp(string $url)
  * @method static \Peppermint\AiBrainBridge\Channels\ChannelClient channel(string $channel)
  * @method static array channels()
  * @method static bool emit(string $type, array $payload, ?string $entityRef = null, ?string $correlationId = null)
