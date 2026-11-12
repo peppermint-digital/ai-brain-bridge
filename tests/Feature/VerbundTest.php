@@ -141,6 +141,48 @@ describe('Die Akte binden und loesen', function (): void {
         Akte::binden('auftrag', '7', 'projekt', '884', 'peppermint-manager');
     });
 
+    it('gibt die eigene Adresse als a_adresse mit', function (): void {
+        AiBrain::shouldReceive('call')
+            ->once()
+            ->with('dossier-link-tool', Mockery::on(
+                fn (array $argumente): bool => ($argumente['a_adresse'] ?? null) === '/orders/7'
+            ))
+            ->andReturn(['kennung' => 'D-10417']);
+
+        Akte::binden('auftrag', '7', 'projekt', '884', 'peppermint-manager', '/orders/7');
+    });
+
+    it('sendet NIE eine Adresse fuer den fremden Datensatz', function (): void {
+        /*
+         * Es gibt mit Absicht kein `b_adresse` (#9815). Wer einen fremden
+         * Datensatz mitbindet, kennt dessen Adresse nicht und koennte sie nur
+         * raten — genau das soll die Adresse am Verweis verhindern. Das Brain
+         * lehnt eine fremde Adresse ohnehin ab; dieser Test haelt fest, dass
+         * sie hier gar nicht erst entsteht.
+         */
+        AiBrain::shouldReceive('call')
+            ->once()
+            ->with('dossier-link-tool', Mockery::on(
+                fn (array $argumente): bool => ! array_key_exists('b_adresse', $argumente)
+            ))
+            ->andReturn(['kennung' => 'D-10417']);
+
+        Akte::binden('auftrag', '7', 'projekt', '884', 'peppermint-manager', '/orders/7');
+    });
+
+    it('laesst a_adresse weg, wenn keine genannt ist, statt null zu senden', function (): void {
+        // Sonst traegt das Brain beim Nachtragen eine leere Adresse ein und
+        // haelt den Verweis fuer versorgt.
+        AiBrain::shouldReceive('call')
+            ->once()
+            ->with('dossier-link-tool', Mockery::on(
+                fn (array $argumente): bool => ! array_key_exists('a_adresse', $argumente)
+            ))
+            ->andReturn(['kennung' => 'D-10417']);
+
+        Akte::binden('auftrag', '7', 'projekt', '884', 'peppermint-manager');
+    });
+
     it('laesst b_system weg, wenn keines genannt ist, statt null zu senden', function (): void {
         AiBrain::shouldReceive('call')
             ->once()

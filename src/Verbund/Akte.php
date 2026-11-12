@@ -59,6 +59,13 @@ final class Akte
      *
      * Zweimal dasselbe Paar zu binden ist folgenlos.
      *
+     * @param  string|null  $adresse  Pfad des EIGENEN Datensatzes im eigenen
+     *                                System, z. B. `/orders/4312`. Am besten
+     *                                mit `route('orders.show', $id, false)`
+     *                                erzeugt: Das ist die Route selbst und
+     *                                kann nicht von ihr abweichen, anders als
+     *                                ein Muster in einer Konfiguration.
+     *
      * @return string|null Die Kennung der Akte (`D-10417`), oder null, wenn
      *                     die Bruecke nicht eingerichtet ist.
      *
@@ -71,6 +78,7 @@ final class Akte
         string $andereArt,
         string $andereKennung,
         ?string $anderesSystem = null,
+        ?string $adresse = null,
     ): ?string {
         self::pruefeArt($art);
         self::pruefeArt($andereArt);
@@ -82,6 +90,22 @@ final class Akte
         $antwort = AiBrain::call('dossier-link-tool', array_filter([
             'a_art' => $art,
             'a_kennung' => $kennung,
+            /*
+             * Die Adresse gilt nur fuer den EIGENEN Datensatz (#9815).
+             *
+             * Es gibt mit Absicht kein `b_adresse`: Wer einen fremden
+             * Datensatz mitbindet, kennt dessen Adresse nicht und koennte sie
+             * nur raten — genau das soll die Adresse am Verweis verhindern.
+             * Das Brain lehnt eine fremde Adresse ohnehin ab; hier gibt es sie
+             * gar nicht erst zu tippen.
+             *
+             * PFADANTEIL, kein voller Verweis: Den Rechnernamen haelt das
+             * Brain je Produkt (`connected_products.web_url`) und setzt beim
+             * Lesen zusammen. Eine zweite Fassung des Hostnamens hier waere
+             * dieselbe doppelte Wahrheit, gegen die die Akte gebaut ist — und
+             * sie veraltet beim naechsten Domainwechsel still.
+             */
+            'a_adresse' => $adresse,
             'b_art' => $andereArt,
             'b_kennung' => $andereKennung,
             'b_system' => $anderesSystem,
