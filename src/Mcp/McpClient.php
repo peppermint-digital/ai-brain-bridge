@@ -6,6 +6,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
 use Peppermint\AiBrainBridge\Exceptions\AiBrainBridgeException;
+use Peppermint\AiBrainBridge\Exceptions\McpAufrufGescheitert;
 
 /**
  * Minimaler MCP-Client (Streamable-HTTP, JSON-RPC) für einen MCP-Server —
@@ -95,22 +96,42 @@ class McpClient
     }
 
     /**
+     * Geworfen wird {@see McpAufrufGescheitert} — eine UNTERKLASSE von
+     * {@see AiBrainBridgeException}, nicht ein Ersatz dafuer.
+     *
+     * Der Grund steht in der Unterklasse: Der HTTP-Status stand hier bis zum
+     * 12.11.2026 nur im Meldungstext, und ein Aufrufer, der eine ABSAGE
+     * (401/403) von einer STOERUNG unterscheiden wollte, musste eine
+     * Zeichenkette lesen. Jeder bestehende `catch` faengt die Unterklasse
+     * unveraendert mit, und die Meldungstexte sind wortgleich geblieben.
+     *
+     * Eine ausgefallene VERBINDUNG kommt hier nicht als eigener Fall vor, und
+     * das ist Absicht: Laravel wirft dafuer selbst
+     * `Illuminate\Http\Client\ConnectionException` (es umschliesst den
+     * Guzzle-Fehler in `PendingRequest`), und die ist schon ein eigener Typ.
+     * Sie wird hier bewusst NICHT abgefangen — „die Nabe hat nicht
+     * geantwortet" und „die Nabe hat abgelehnt" sind zwei Aussagen, und der
+     * Aufrufer soll beide am TYP unterscheiden koennen statt am Text.
+     *
      * @param  array<string, mixed>  $params
      * @return array<string, mixed>
+     *
+     * @throws McpAufrufGescheitert wenn die Nabe geantwortet, aber abgelehnt hat
+     * @throws \Illuminate\Http\Client\ConnectionException wenn sie gar nicht geantwortet hat
      */
     protected function rpc(string $method, array $params = []): array
     {
         $response = $this->request()->post($this->endpoint, $this->envelope($method, $params));
 
         if (! $response->successful()) {
-            throw new AiBrainBridgeException("MCP {$method} failed: HTTP {$response->status()}");
+            throw McpAufrufGescheitert::status($method, $response->status());
         }
 
         $body = $response->json();
 
         if (isset($body['error'])) {
             $msg = $body['error']['message'] ?? 'unknown error';
-            throw new AiBrainBridgeException("MCP {$method} error: {$msg}");
+            throw McpAufrufGescheitert::nutzlast($method, (string) $msg);
         }
 
         return (array) ($body['result'] ?? []);
