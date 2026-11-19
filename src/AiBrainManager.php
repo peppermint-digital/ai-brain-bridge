@@ -442,6 +442,29 @@ class AiBrainManager
         ))->providers($capability);
     }
 
+    /**
+     * Wie {@see providers()}, aber mit Grund, wenn die Liste nicht kam (Bug #1513).
+     *
+     * Form wie {@see gateway()}: `ok`, `data` (die Anbieterzeilen), `error`,
+     * `message`. Ausfall von Brain ist `unreachable`, eine Absage von Brain
+     * traegt den Namen, den Brain schickt (`not_allowed`, ...). Leer mit
+     * `ok: true` heisst: niemand bedient den Vorgang.
+     *
+     * `providers()` bleibt, wie es ist — fuenf Pakete rufen es und duerfen
+     * davon nichts merken. Begruendung an
+     * {@see GatewayClient::anbieterMitGrund()}.
+     *
+     * @return array{ok: bool, data: array<int, array<string, mixed>>|null, text: null, error: string|null, message: string|null, product: null}
+     */
+    public function anbieterMitGrund(string $capability, ?string $actingAs = null, ?string $channel = null): array
+    {
+        return (new GatewayClient(
+            $this->config,
+            $this->tokens,
+            fn (): array => $this->actingUserHeaders($actingAs, $channel),
+        ))->anbieterMitGrund($capability);
+    }
+
     public function brain(): McpClient
     {
         $url = $this->config['mcp']['brain_url']

@@ -144,15 +144,8 @@ class GatewayClient
      */
     public function providers(string $capability): array
     {
-        $url = rtrim((string) ($this->config['base_url'] ?? ''), '/')
-            .'/api/v1/capabilities/'.rawurlencode($capability).'/providers';
-
         try {
-            $antwort = Http::withToken($this->tokens->token())
-                ->withHeaders(($this->actingHeaders)())
-                ->acceptJson()
-                ->timeout((int) ($this->config['gateway']['timeout'] ?? 20))
-                ->get($url);
+            $antwort = $this->anbieterAnfrage($capability);
         } catch (\Throwable) {
             return [];
         }
@@ -163,6 +156,124 @@ class GatewayClient
             return [];
         }
 
+        return $this->anbieterZeilen($daten);
+    }
+
+    /**
+     * Dieselbe Frage wie {@see providers()} — und WARUM die Liste leer ist (Bug #1513).
+     *
+     * ## Warum es diese Methode neben `providers()` gibt
+     *
+     * `providers()` bildet vier Lagen auf dieselbe leere Liste ab: Brain ist
+     * nicht erreichbar, Brain antwortet mit einem Fehler, dieses System ist
+     * fuer den Vorgang nicht freigeschaltet — und es gibt wirklich niemanden,
+     * der ihn bedient. Nur die letzte ist eine Auskunft. Gemessen am
+     * 19.11.2026 (Bug #1513) mit dem echten Client gegen einen geschlossenen
+     * Port: Im Aufgabenpaket kam daraus ein Register ohne fremde Quellen UND
+     * eine Ernte, die sich `complete` nannte. Eine Liste, die kuerzer ist als
+     * sie sein sollte, behauptete, vollstaendig zu sein.
+     *
+     * **Der Grund liegt dabei schon auf der Leitung.** Brain antwortet auf
+     * diese Frage bei fehlender Freigabe mit `ok: false` und `error:
+     * not_allowed` — aus demselben Wortschatz wie der Gateway.
+     * `providers()` hat ihn verworfen. Hier wird er durchgereicht, und nicht
+     * neu erfunden.
+     *
+     * ## Die Form ist die von `call()`, mit Absicht
+     *
+     * `ok`, `data`, `text`, `error`, `message`, `product` — wortgleich zu
+     * {@see call()}, und dieselben Regeln:
+     *
+     * - Faellt der Weg ZU Brain aus (Verbindung, Zeitgrenze, Token), ist das
+     *   `unreachable`, nicht eine Ausnahme.
+     * - Eine Antwort, die kein JSON ist, ist `tool_failed`.
+     * - `ok` wird STRENG gelesen, nur ein echtes `true` gilt — die Begruendung
+     *   steht an `call()`.
+     * - `error` ist die Zeichenkette, die Brain schickt, und wird nicht
+     *   gedeutet. Einen eigenen Typ fuer die Namen hat die Bruecke nicht, und
+     *   diese Methode fuehrt keinen ein (siehe {@see \Peppermint\AiBrainBridge\Exceptions\McpAufrufGescheitert}).
+     *
+     * Kein neuer Weg und kein neues Vokabular: dieselbe Adresse wie
+     * `providers()`, dieselbe Form wie `call()`.
+     *
+     * Bei Erfolg steht in `data` die Liste, Zeile fuer Zeile dieselbe wie aus
+     * `providers()` — auch leer. **Leer mit `ok: true` heisst jetzt wirklich
+     * „niemand bedient das"**, und nur das.
+     *
+     * ## Warum `providers()` NICHT umgebaut wurde
+     *
+     * Fuenf Pakete rufen es (gemessen 19.11.2026: tasks, calendar, mailbox,
+     * inbox, notifications), und `AnbieterTest` schreibt fest, dass jeder
+     * Fehlschlag dort `[]` ist. Ein geaenderter Rueckgabetyp haette alle fuenf
+     * zugleich umgeworfen. Entschieden von Bastian am 19.11.2026: eine
+     * Schwester-Methode, und jedes Paket zieht fuer sich nach. Beide teilen
+     * sich Anfrage und Zeilenform, damit sie nicht auseinanderlaufen.
+     *
+     * @return array{ok: bool, data: array<int, array{slug: string, name: string|null, key: string, label: string, url: string|null, capabilities: array<int, string>}>|null, text: null, error: string|null, message: string|null, product: null}
+     */
+    public function anbieterMitGrund(string $capability): array
+    {
+        try {
+            $antwort = $this->anbieterAnfrage($capability);
+        } catch (\Throwable $e) {
+            return $this->fehler('unreachable', 'AI Brain nicht erreichbar: '.$e->getMessage());
+        }
+
+        $daten = $antwort->json();
+
+        if (! is_array($daten)) {
+            return $this->fehler('tool_failed', 'Unverständliche Antwort von AI Brain (HTTP '.$antwort->status().')');
+        }
+
+        if (($daten['ok'] ?? null) !== true) {
+            return [
+                'ok' => false,
+                'data' => null,
+                'text' => null,
+                'error' => isset($daten['error']) ? (string) $daten['error'] : null,
+                'message' => isset($daten['message'])
+                    ? (string) $daten['message']
+                    : 'AI Brain hat die Anbieter nicht genannt (HTTP '.$antwort->status().')',
+                'product' => null,
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'data' => $this->anbieterZeilen($daten),
+            'text' => null,
+            'error' => null,
+            'message' => null,
+            'product' => null,
+        ];
+    }
+
+    /**
+     * Die eine Anfrage beider Methoden. Wirft — gefangen wird beim Aufrufer,
+     * weil die beiden verschieden darauf antworten.
+     */
+    protected function anbieterAnfrage(string $capability): \Illuminate\Http\Client\Response
+    {
+        $url = rtrim((string) ($this->config['base_url'] ?? ''), '/')
+            .'/api/v1/capabilities/'.rawurlencode($capability).'/providers';
+
+        return Http::withToken($this->tokens->token())
+            ->withHeaders(($this->actingHeaders)())
+            ->acceptJson()
+            ->timeout((int) ($this->config['gateway']['timeout'] ?? 20))
+            ->get($url);
+    }
+
+    /**
+     * Die Anbieterzeilen einer erfolgreichen Antwort — fuer beide Methoden
+     * an EINER Stelle, damit Schluessel und Beschriftung nicht zweimal
+     * abgeleitet werden.
+     *
+     * @param  array<string, mixed>  $daten
+     * @return array<int, array{slug: string, name: string|null, key: string, label: string, url: string|null, capabilities: array<int, string>}>
+     */
+    protected function anbieterZeilen(array $daten): array
+    {
         $anbieter = [];
 
         foreach ((array) ($daten['providers'] ?? []) as $zeile) {
