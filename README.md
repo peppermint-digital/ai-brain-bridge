@@ -327,6 +327,25 @@ bestimmt das Zielprodukt ueber `AI_BRAIN_LOGIN_AFTER` — nicht AI Brain.
 **Wenn AI Brain ausfaellt**, erscheint keine Leiste. Sie ist Beiwerk und darf nie
 der Grund sein, dass eine Seite nicht laedt.
 
+### Eigene Eintraege des Produkts (Module)
+
+Ein Produkt kann der Leiste eigene Eintraege beisteuern — der Manager seine
+Module (Manager, Personal, Betriebsmittel). Dafuer bindet es den Vertrag
+`Peppermint\AiBrainBridge\Switcher\LokaleEintraege`:
+
+```php
+$this->app->bind(LokaleEintraege::class, ModulEintraege::class);
+```
+
+Die Eintraege stehen in der Antwort unter `lokal` und nehmen in der Leiste den
+Platz des eigenen Systems ein. Sie werden bei **jedem** Aufruf frisch erfragt
+und nie mit der Liste von AI Brain zwischengespeichert — ein entzogenes Modul
+verschwindet beim naechsten Laden. Welches aktiv ist, sagt `aktuell`; eine
+Inertia-Anwendung setzt beim Navigieren zusaetzlich `lokal-aktiv="<schluessel>"`
+am Element `<peppermint-app-switcher>`.
+
+Ohne Bindung bleibt alles wie vorher — kein `lokal` in Antwort und Markup.
+
 ### Die Postfach-Kachel
 
 In der Leiste sitzt eine Kachel mit der Zahl des Posteingangs. Sie erscheint

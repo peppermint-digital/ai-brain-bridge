@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
 use Peppermint\AiBrainBridge\Config\BridgeConfig;
 use Peppermint\AiBrainBridge\Facades\AiBrain;
+use Peppermint\AiBrainBridge\Switcher\LokaleEintraege;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -22,7 +23,9 @@ use Symfony\Component\HttpFoundation\Response;
  * Zwei Aufgaben, die zusammengehoeren:
  *
  * 1. `apps()` — welche Systeme stehen dieser Person offen? Beantwortet AI Brain
- *    aus dem Verzeichnis; das Produkt fragt nur und reicht durch.
+ *    aus dem Verzeichnis; das Produkt fragt nur und reicht durch. Dazu kann
+ *    das Produkt eigene Eintraege beisteuern ({@see LokaleEintraege}, etwa
+ *    seine Module) — die beantwortet es selbst, und sie stehen unter `lokal`.
  * 2. `go()` — der Weg hinein, ohne Anmeldemaske.
  */
 class SwitcherController
@@ -105,6 +108,14 @@ class SwitcherController
 
         $nutzlast = Cache::remember($this->schluessel($user), $dauer, fn (): array => $this->holen());
 
+        // Erst NACH dem Zwischenspeicher: Die Eintraege des Produkts gehoeren
+        // nie hinein (siehe `lokal()`).
+        $lokal = $this->lokal($user, $request);
+
+        if ($lokal !== null) {
+            $nutzlast['lokal'] = $lokal;
+        }
+
         return response()->json($nutzlast);
     }
 
@@ -149,6 +160,40 @@ class SwitcherController
         Cache::forget($this->schluessel($user));
 
         return response()->json($antwort->json() ?? [], $antwort->status());
+    }
+
+    /**
+     * Die Eintraege, die das Produkt der Leiste beisteuert — oder `null`, wenn
+     * es keine beisteuert.
+     *
+     * `null` und `[]` sind verschieden: `null` heisst „Vertrag nicht
+     * gebunden", und dann bleibt alles byte-gleich wie vor dem Vertrag (kein
+     * Schluessel `lokal`). `[]` heisst „gebunden, aber diese Person sieht
+     * nichts davon".
+     *
+     * Frisch bei jedem Aufruf und NIE im Zwischenspeicher: Die Antwort von AI
+     * Brain liegt fuenf Minuten je Person dort. Stuenden die Eintraege mit
+     * darin, saehe jemand ein entzogenes Modul noch fuenf Minuten lang — und
+     * landete beim Klick auf einer 403.
+     *
+     * Fail-safe wie die ganze Leiste: Wirft das Produkt, gibt es keine
+     * Eintraege, und die Seite laedt trotzdem.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    protected function lokal(Authenticatable $user, Request $request): ?array
+    {
+        if (! app()->bound(LokaleEintraege::class)) {
+            return null;
+        }
+
+        try {
+            return array_values(app(LokaleEintraege::class)->fuer($user, $request));
+        } catch (\Throwable $e) {
+            Log::warning('Umschaltleiste: Eintraege des Produkts nicht ermittelt', ['fehler' => $e->getMessage()]);
+
+            return [];
+        }
     }
 
     /**
@@ -239,6 +284,17 @@ class SwitcherController
         // Liste nach dem Laden ueber `endpoint`. Das kostet ein Nachpoppen —
         // aber nur beim ersten Mal, und es haelt die Seite frei.
         $bereit = Cache::get($this->schluessel($user));
+
+        // Die Eintraege des Produkts stehen immer sofort bereit — sie kosten
+        // kein Netz. Fehlt die Liste von AI Brain, geht NUR `lokal` mit (ohne
+        // `apps`): Die Leiste nimmt die Systeme dann aus ihrem eigenen
+        // Speicher und fragt danach wie bisher nach.
+        $lokal = $this->lokal($user, request());
+
+        if ($lokal !== null) {
+            $bereit = [...(is_array($bereit) ? $bereit : []), 'lokal' => $lokal];
+        }
+
         $liste = is_array($bereit) ? ' apps="'.e((string) json_encode($bereit)).'"' : '';
 
         $postfach = $this->postfach();

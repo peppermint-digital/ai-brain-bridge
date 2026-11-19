@@ -27,6 +27,12 @@
  * Postfach-Kachel. Ein Produkt ohne das Benachrichtigungspaket hat keine
  * Posteingangs-Seite, und ein Symbol auf einen 404 ist schlimmer als keines.
  *
+ * EINTRAEGE DES PRODUKTS (`lokal`, z. B. die Module des Managers): kommen in
+ * der Nutzlast unter `lokal` mit und nehmen den Platz des eigenen Systems ein.
+ * Welcher davon aktiv ist, sagt `aktuell` — oder, weil eine Inertia-Anwendung
+ * das Layout beim Navigieren nicht neu schreibt, das Attribut
+ * `lokal-aktiv="<schluessel>"`, das die Anwendung zur Laufzeit setzt.
+ *
  * ABSCHALTEN fuer einzelne Ansichten (Avatar-Vollbild, Praesentationen):
  *
  *     document.documentElement.dataset.switcher = 'aus';
@@ -34,7 +40,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.10.0';
+    const VERSION = '1.11.0';
 
     /**
      * Die Symbole, die ein Merkzettel tragen kann (#5320).
@@ -133,10 +139,15 @@
      * endet im Zweifel damit, dass gar nichts erscheint.
      */
     class AppSwitcher extends HTMLElement {
+        static get observedAttributes() {
+            return ['lokal-aktiv'];
+        }
+
         constructor() {
             super();
             this.apps = [];
             this.pins = [];
+            this.lokal = [];
             this.offen = false;
             this.bearbeitet = false;
             this.schliessUhr = null;
@@ -184,6 +195,17 @@
             }
         }
 
+        /**
+         * Die Anwendung meldet ein anderes aktives Modul (Inertia-Navigation).
+         * Neu zeichnen, aber nur, wenn schon etwas steht — beim ersten Setzen
+         * vor `connectedCallback` gibt es noch keine Leiste.
+         */
+        attributeChangedCallback(name, alt, neu) {
+            if (name === 'lokal-aktiv' && alt !== neu && this.leiste) {
+                this.zeichnen({ apps: this.apps, pins: this.pins, lokal: this.lokal });
+            }
+        }
+
         disconnectedCallback() {
             document.removeEventListener('keydown', this.aufTaste);
             document.removeEventListener('pointerdown', this.aufKlickAussen);
@@ -203,7 +225,20 @@
             // Erst das, was sofort dasteht: die vom Server mitgelieferte Liste
             // oder der Zwischenspeicher. Damit ist die Leiste ohne Warten da
             // und poppt beim Ankommen nicht nach.
-            const sofort = this.ausAttribut() ?? this.ausSpeicher();
+            let sofort = this.ausAttribut() ?? this.ausSpeicher();
+
+            // Hat der Server nur die Eintraege des Produkts mitgegeben (die
+            // Liste von AI Brain stand noch nicht bereit), kommen die Systeme
+            // aus dem eigenen Speicher — sonst fehlten sie bis zur Antwort.
+            if (sofort && sofort.ohneSysteme) {
+                const gespeichert = this.ausSpeicher();
+
+                sofort = {
+                    apps: gespeichert?.apps ?? [],
+                    pins: gespeichert?.pins ?? [],
+                    lokal: sofort.lokal,
+                };
+            }
 
             if (sofort) {
                 this.zeichnen(sofort);
@@ -234,6 +269,7 @@
                 const nutzlast = {
                     apps: Array.isArray(daten.apps) ? daten.apps : [],
                     pins: Array.isArray(daten.pins) ? daten.pins : [],
+                    lokal: Array.isArray(daten.lokal) ? daten.lokal : [],
                 };
 
                 this.inSpeicher(nutzlast);
@@ -265,13 +301,17 @@
          */
         normalisieren(roh) {
             if (Array.isArray(roh)) {
-                return { apps: roh, pins: [] };
+                return { apps: roh, pins: [], lokal: [] };
             }
 
             if (roh && typeof roh === 'object') {
                 return {
                     apps: Array.isArray(roh.apps) ? roh.apps : [],
                     pins: Array.isArray(roh.pins) ? roh.pins : [],
+                    lokal: Array.isArray(roh.lokal) ? roh.lokal : [],
+                    // Nur die Eintraege des Produkts, ohne die Liste von AI
+                    // Brain — siehe `laden()`.
+                    ohneSysteme: !('apps' in roh) && Array.isArray(roh.lokal),
                 };
             }
 
@@ -307,6 +347,9 @@
         zeichnen(nutzlast) {
             this.apps = nutzlast.apps;
             this.pins = nutzlast.pins;
+            this.lokal = Array.isArray(nutzlast.lokal) ? nutzlast.lokal : [];
+
+            const kacheln = this.kacheln();
 
             // Ein einziger Eintrag und kein Merkzettel heisst: es gibt nichts
             // zu wechseln. Dann ist auch der Griff zu viel — er verspraeche
@@ -316,7 +359,7 @@
             // dem der Posteingang noch haengt — die Glocke in der Anwendung
             // ist dafuer weggefallen. Eine Leiste, die sich wegen eines
             // einzelnen Systems versteckt, versteckte ihn mit.
-            const zeigen = this.apps.length > 1 || this.pins.length > 0 || this.hatPostfach();
+            const zeigen = kacheln.length > 1 || this.pins.length > 0 || this.hatPostfach();
 
             this.wrap.hidden = !zeigen;
 
@@ -324,7 +367,11 @@
                 return;
             }
 
-            const systeme = this.apps.map((app) => {
+            const systeme = kacheln.map((app) => {
+                if (app.lokal === true) {
+                    return this.lokalKnopf(app);
+                }
+
                 const aktuell = app.aktuell === true;
                 const ziel = aktuell ? '' : ` href="${this.sicher(app.url)}"`;
 
@@ -372,6 +419,63 @@
 
             this.bilderAbsichern();
             this.knoepfeVerdrahten();
+        }
+
+        /* ------------------------------------- die Eintraege des Produkts */
+
+        /**
+         * Systeme und Eintraege des Produkts in einer Reihe.
+         *
+         * Die Eintraege des Produkts (seine Module) stehen dort, wo sonst das
+         * eigene System steht — der Eintrag, den AI Brain mit `aktuell`
+         * markiert. Sonst stuende „Peppermint Manager" neben dem Modul
+         * „Manager". Kennt AI Brain das eigene System nicht (oder antwortet
+         * nicht), stehen sie vorn.
+         *
+         * `this.apps` selbst bleibt unveraendert: Der Name des eigenen Systems
+         * wird noch gebraucht, um Seitentitel fuer Merkzettel zu kuerzen.
+         */
+        kacheln() {
+            if (this.lokal.length === 0) {
+                return this.apps;
+            }
+
+            const aktiv = this.getAttribute('lokal-aktiv');
+            const eigene = this.lokal.map((eintrag) => ({
+                ...eintrag,
+                lokal: true,
+                aktuell: aktiv ? eintrag.schluessel === aktiv : eintrag.aktuell === true,
+            }));
+
+            const stelle = this.apps.findIndex((app) => app.aktuell === true);
+
+            if (stelle === -1) {
+                return [...eigene, ...this.apps];
+            }
+
+            return [...this.apps.slice(0, stelle), ...eigene, ...this.apps.slice(stelle + 1)];
+        }
+
+        /**
+         * Ein Eintrag des Produkts — dieselbe Kachel wie ein System, aber mit
+         * Symbol oder Kuerzel statt Logo (ein Modul hat keine Bildmarke).
+         */
+        lokalKnopf(eintrag) {
+            const aktuell = eintrag.aktuell === true;
+            const ziel = aktuell ? '' : ` href="${this.sicher(eintrag.url)}"`;
+            const inhalt = this.symbolBild(eintrag.symbol)
+                || `<span class="kuerzel-modul">${this.sicher(eintrag.kuerzel || this.pinKuerzel(eintrag.name))}</span>`;
+
+            return `
+                <a class="knopf modul${aktuell ? ' ist-hier' : ''}"${ziel}
+                   ${aktuell ? 'aria-current="page" tabindex="-1"' : ''}
+                   data-modul="${this.sicher(eintrag.schluessel)}"
+                   aria-label="${this.sicher(eintrag.name)}">
+                    <span class="kachel modul-kachel" style="--farbe: ${this.sicher(eintrag.farbe)}">
+                        ${inhalt}
+                    </span>
+                    <span class="hinweis" role="tooltip">${this.sicher(eintrag.name)}</span>
+                </a>`;
         }
 
         /* ------------------------------------------------- das Postfach */
@@ -1263,6 +1367,15 @@
      * und gehoert damit sichtbar zur Leiste und nicht zu den Merkzetteln.
      */
     .postfach-kachel svg { opacity: 0.62; transition: opacity 140ms ease; }
+
+    /* Ein Modul des Produkts: Kachel wie ein System, Symbol statt Logo, und
+       unten der Farbstreifen des Moduls wie bei den Merkzetteln. */
+    .modul-kachel { box-shadow: inset 0 -3px 0 0 var(--farbe, transparent); }
+    .modul-kachel .symbol { width: 20px; height: 20px; opacity: 0.62; transition: opacity 140ms ease; }
+    .knopf.modul:hover .modul-kachel .symbol,
+    .knopf.modul:focus-visible .modul-kachel .symbol,
+    .knopf.modul.ist-hier .modul-kachel .symbol { opacity: 1; }
+    .kuerzel-modul { line-height: 1; }
     .knopf.postfach:hover .postfach-kachel svg,
     .knopf.postfach:focus-visible .postfach-kachel svg { opacity: 1; }
 
