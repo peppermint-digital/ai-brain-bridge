@@ -104,9 +104,15 @@ class SwitcherController
             return response()->json(['apps' => [], 'pins' => []]);
         }
 
-        $dauer = (int) config('ai-brain-bridge.switcher.cache_seconds', 300);
+        // Ohne Anmeldeweg fragt die Leiste AI Brain nicht (pm #10190): Die
+        // Systeme von dort fuehrten auf Anmeldemasken. Es bleiben die
+        // Eintraege des Produkts.
+        $nutzlast = ['apps' => [], 'pins' => []];
 
-        $nutzlast = Cache::remember($this->schluessel($user), $dauer, fn (): array => $this->holen());
+        if (self::mitAnmeldeweg()) {
+            $dauer = (int) config('ai-brain-bridge.switcher.cache_seconds', 300);
+            $nutzlast = Cache::remember($this->schluessel($user), $dauer, fn (): array => $this->holen());
+        }
 
         // Erst NACH dem Zwischenspeicher: Die Eintraege des Produkts gehoeren
         // nie hinein (siehe `lokal()`).
@@ -252,7 +258,11 @@ class SwitcherController
     {
         // Abgeschaltet: nichts. Die Direktive ist trotzdem registriert, weil
         // Blade eine unbekannte Direktive woertlich auf die Seite schreibt.
-        if (! config('ai-brain-bridge.switcher.enabled') || ! config('ai-brain-bridge.login.enabled')) {
+        //
+        // Seit pm #10190 nur noch am eigenen Schalter: Ohne Anmeldeweg zeigt
+        // die Leiste die Eintraege des Produkts, ohne Systeme aus AI Brain und
+        // ohne Merkzettel.
+        if (! config('ai-brain-bridge.switcher.enabled')) {
             return '';
         }
 
@@ -262,11 +272,14 @@ class SwitcherController
             return '';
         }
 
+        $mitAnmeldeweg = self::mitAnmeldeweg();
+
         // Marke, die sich mit der Datei aendert — sonst bleibt eine Stunde
         // lang (`max-age`) die alte Fassung im Browser.
         $script = e(route('ai-brain-bridge.switcher.script').'?v='.$this->fassung());
         $endpunkt = e(route('ai-brain-bridge.switcher.apps'));
-        $pins = e(route('ai-brain-bridge.switcher.pins'));
+        // Ohne `pin-endpoint` blendet die Leiste das Anpinnen selbst aus.
+        $pins = $mitAnmeldeweg ? ' pin-endpoint="'.e(route('ai-brain-bridge.switcher.pins')).'"' : '';
         $slug = e((string) (BridgeConfig::load()['source']
             ?? config('ai-brain-bridge.source')));
 
@@ -283,13 +296,19 @@ class SwitcherController
         // Steht nichts bereit, faellt das Attribut weg und die Leiste holt die
         // Liste nach dem Laden ueber `endpoint`. Das kostet ein Nachpoppen —
         // aber nur beim ersten Mal, und es haelt die Seite frei.
-        $bereit = Cache::get($this->schluessel($user));
+        $bereit = $mitAnmeldeweg ? Cache::get($this->schluessel($user)) : null;
 
         // Die Eintraege des Produkts stehen immer sofort bereit — sie kosten
         // kein Netz. Fehlt die Liste von AI Brain, geht NUR `lokal` mit (ohne
         // `apps`): Die Leiste nimmt die Systeme dann aus ihrem eigenen
         // Speicher und fragt danach wie bisher nach.
         $lokal = $this->lokal($user, request());
+
+        // Ohne Anmeldeweg gibt es nur die eigenen Eintraege. Hat das Produkt
+        // keine (oder sieht diese Person keinen), gaebe es eine leere Leiste.
+        if (! $mitAnmeldeweg && ($lokal === null || $lokal === [])) {
+            return '';
+        }
 
         if ($lokal !== null) {
             $bereit = [...(is_array($bereit) ? $bereit : []), 'lokal' => $lokal];
@@ -301,7 +320,7 @@ class SwitcherController
 
         return <<<HTML
             <script src="{$script}" defer></script>
-            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}" pin-endpoint="{$pins}"{$postfach}{$liste}></peppermint-app-switcher>
+            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}"{$pins}{$postfach}{$liste}></peppermint-app-switcher>
             HTML;
     }
 
@@ -412,6 +431,16 @@ class SwitcherController
      * doppelte Anzeige, sondern die gar keine: keine Kachel, keine Glocke,
      * und der Posteingang nur noch ueber die Adresszeile erreichbar.
      */
+    /**
+     * Gibt es den gemeinsamen Anmeldeweg? Daran haengen die Systeme aus AI
+     * Brain, der Merkzettel und die Postfach-Kachel — nicht die Leiste selbst
+     * (pm #10190).
+     */
+    public static function mitAnmeldeweg(): bool
+    {
+        return (bool) config('ai-brain-bridge.login.enabled');
+    }
+
     public static function zeigtPostfach(): bool
     {
         return (bool) config('ai-brain-bridge.switcher.enabled')

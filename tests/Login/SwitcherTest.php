@@ -328,3 +328,19 @@ it('haelt den Telefon-Platz der Leiste fest', function () {
         // rechts buendig auf der Fensterkante.
         ->and($mobil)->toContain('box-sizing: border-box');
 });
+
+/*
+ * Gegenprobe zu tests/OhneLogin (pm #10190): Mit Anmeldeweg bleibt alles wie
+ * bisher — Weg `go`, Merkzettel und die Liste aus AI Brain.
+ */
+it('behaelt mit Anmeldeweg Weg, Merkzettel und die Liste aus AI Brain', function () {
+    $this->actingAs($this->person);
+    Cache::put('ai-brain-switcher:'.$this->person->getAuthIdentifier(), ['apps' => [['slug' => 'ai-brain', 'name' => 'AI Brain']], 'pins' => []], 60);
+
+    $markup = app(SwitcherController::class)->markup();
+
+    expect(Route::has('ai-brain-bridge.switcher.go'))->toBeTrue()
+        ->and(Route::has('ai-brain-bridge.switcher.pins'))->toBeTrue()
+        ->and($markup)->toContain('pin-endpoint=')
+        ->and($markup)->toContain('ai-brain&quot;');
+});

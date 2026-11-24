@@ -1,6 +1,7 @@
 <?php
 
 use Peppermint\AiBrainBridge\Tests\LoginTestCase;
+use Peppermint\AiBrainBridge\Tests\OhneLoginTestCase;
 use Peppermint\AiBrainBridge\Tests\TestCase;
 use Peppermint\AiBrainBridge\Tests\VerbindenTestCase;
 
@@ -10,6 +11,8 @@ uses(TestCase::class)->in('Feature');
 // Die Freischaltung muss vor dem Hochfahren stehen, also in einer eigenen
 // TestCase — und Pest lässt pro Ordner nur eine zu.
 uses(LoginTestCase::class)->in('Login');
+
+uses(OhneLoginTestCase::class)->in('OhneLogin');
 
 // Konto verbinden ohne gemeinsame Anmeldung — eigener Boot-Zustand.
 uses(VerbindenTestCase::class)->in('Verbinden');

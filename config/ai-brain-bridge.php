@@ -157,9 +157,11 @@ return [
     | AUS als Vorgabe: Solange nichts eingeschaltet ist, registriert das Paket
     | die Routen gar nicht, und im Produkt aendert sich nichts.
     |
-    | Ohne `login.enabled` bleibt die Leiste ebenfalls weg — ein Knopf, der in
-    | ein System fuehrt, in dem der gemeinsame Anmeldeweg fehlt, endet auf der
-    | Anmeldemaske. Das ist genau der Weg, den sie ersparen soll.
+    | Ohne `login.enabled` zeigt die Leiste nur die EIGENEN Eintraege des
+    | Produkts (Module, Bereiche — `LokaleEintraege`), ohne Systeme aus AI
+    | Brain, ohne Merkzettel, ohne Postfach-Kachel: Ein Knopf in ein anderes
+    | System endete dort auf der Anmeldemaske. Bis pm #10190 blieb die Leiste
+    | dann ganz weg — und mit ihr der einzige Weg zu den Modulen.
     */
     'switcher' => [
         'enabled' => filter_var(env('AI_BRAIN_SWITCHER', false), FILTER_VALIDATE_BOOL),

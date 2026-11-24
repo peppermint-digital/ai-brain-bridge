@@ -353,9 +353,11 @@ Das war alles. Die Leiste selbst liefert das Paket aus; sie laeuft in React- und
 Blade-Anwendungen gleich, weil sie ein Web-Component in reinem JavaScript ist —
 ohne Bauschritt in der einbindenden Anwendung.
 
-**Sie haengt an zwei Schaltern.** Ohne `AI_BRAIN_LOGIN` bleibt sie weg — ein Knopf,
-der in ein System fuehrt, in dem der gemeinsame Anmeldeweg fehlt, endet auf einer
-Anmeldemaske. Genau das soll sie ersparen.
+**Ohne `AI_BRAIN_LOGIN`** zeigt sie nur die eigenen Eintraege des Produkts (siehe
+unten) — keine Systeme aus AI Brain, keinen Merkzettel, keine Postfach-Kachel, und
+die Route `/auth/brain/go` gibt es nicht: Ein Knopf in ein anderes System endete
+ohne gemeinsamen Anmeldeweg auf einer Anmeldemaske. Bis pm #10190 blieb die Leiste
+dann ganz weg, auch mit den Modulen des Produkts.
 
 **Was beim Klick passiert.** Der Knopf zeigt auf `/auth/brain/go` des Ziels:
 Sitzung vorhanden → sofort weiter, sonst → durch den Anmeldeweg. Wohin es geht,

@@ -252,9 +252,14 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
     /**
      * Umschaltleiste zwischen den Peppermint-Systemen (AI Brain #5281).
      *
-     * Haengt an ZWEI Schaltern: an ihrem eigenen und am gemeinsamen Anmeldeweg.
-     * Ohne den zweiten fuehrt jeder Knopf, dessen Ziel keine Sitzung hat, auf
-     * eine Anmeldemaske — also genau dorthin, wo die Leiste hinwegfuehren soll.
+     * Haengt an EINEM Schalter, ihrem eigenen (pm #10190). Bis dahin hing sie
+     * zusaetzlich am gemeinsamen Anmeldeweg — und ein Produkt ohne ihn bekam
+     * gar keine Leiste, auch nicht seine EIGENEN Eintraege (Module, Bereiche).
+     *
+     * Was am Anmeldeweg haengt, bleibt daran: der Weg `go` (er fuehrt ohne
+     * Sitzung in den Anmeldefluss) und der Merkzettel. Ohne Anmeldeweg zeigt
+     * die Leiste nur, was das Produkt selbst beisteuert ({@see LokaleEintraege});
+     * die Systeme aus AI Brain fuehrten dort auf Anmeldemasken.
      */
     protected function registerSwitcherRoutes(): void
     {
@@ -264,18 +269,21 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         // Schalter gehoert deshalb in die AUSGABE, nicht in die Registrierung.
         $this->registerSwitcherDirective();
 
-        if (! config('ai-brain-bridge.switcher.enabled') || ! config('ai-brain-bridge.login.enabled')) {
+        if (! config('ai-brain-bridge.switcher.enabled')) {
             return;
         }
 
         $controller = SwitcherController::class;
         $middleware = (array) config('ai-brain-bridge.switcher.middleware', ['web']);
+        $mitAnmeldeweg = (bool) config('ai-brain-bridge.login.enabled');
 
-        Route::middleware($middleware)->group(function () use ($controller): void {
-            Route::get(
-                (string) config('ai-brain-bridge.switcher.go_path', '/auth/brain/go'),
-                [$controller, 'go'],
-            )->name('ai-brain-bridge.switcher.go');
+        Route::middleware($middleware)->group(function () use ($controller, $mitAnmeldeweg): void {
+            if ($mitAnmeldeweg) {
+                Route::get(
+                    (string) config('ai-brain-bridge.switcher.go_path', '/auth/brain/go'),
+                    [$controller, 'go'],
+                )->name('ai-brain-bridge.switcher.go');
+            }
 
             Route::get(
                 (string) config('ai-brain-bridge.switcher.apps_path', '/ai-brain/switcher/apps'),
@@ -288,10 +296,13 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             )->name('ai-brain-bridge.switcher.script');
 
             // Merkzettel (#5320) — durchgereicht an AI Brain, entschieden dort.
-            Route::match(['post', 'patch', 'delete'],
-                (string) config('ai-brain-bridge.switcher.pins_path', '/ai-brain/switcher/pins'),
-                [$controller, 'pins'],
-            )->name('ai-brain-bridge.switcher.pins');
+            // Nur mit Anmeldeweg: Angepinnt werden Adressen im Verbund.
+            if ($mitAnmeldeweg) {
+                Route::match(['post', 'patch', 'delete'],
+                    (string) config('ai-brain-bridge.switcher.pins_path', '/ai-brain/switcher/pins'),
+                    [$controller, 'pins'],
+                )->name('ai-brain-bridge.switcher.pins');
+            }
         });
     }
 
