@@ -216,18 +216,31 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
      */
     protected function registerLoginRoutes(): void
     {
-        if (! config('ai-brain-bridge.login.enabled')) {
+        $anmelden = (bool) config('ai-brain-bridge.login.enabled');
+        $verbinden = (bool) config('ai-brain-bridge.login.connect');
+
+        if (! $anmelden && ! $verbinden) {
             return;
         }
 
         $controller = BrainLoginController::class;
         $middleware = (array) config('ai-brain-bridge.login.middleware', ['web']);
 
-        Route::middleware($middleware)->group(function () use ($controller): void {
-            Route::get(
-                (string) config('ai-brain-bridge.login.redirect_path', '/auth/brain/redirect'),
-                [$controller, 'redirect'],
-            )->name('ai-brain-bridge.login.redirect');
+        Route::middleware($middleware)->group(function () use ($controller, $anmelden, $verbinden): void {
+            if ($anmelden) {
+                Route::get(
+                    (string) config('ai-brain-bridge.login.redirect_path', '/auth/brain/redirect'),
+                    [$controller, 'redirect'],
+                )->name('ai-brain-bridge.login.redirect');
+            }
+
+            // Konto verbinden (pm #10162) — eigener Schalter, derselbe Rückruf.
+            if ($verbinden) {
+                Route::get(
+                    (string) config('ai-brain-bridge.login.connect_path', '/auth/brain/verbinden'),
+                    [$controller, 'connect'],
+                )->name('ai-brain-bridge.login.connect');
+            }
 
             Route::get(
                 (string) config('ai-brain-bridge.login.callback_path', '/auth/brain/callback'),

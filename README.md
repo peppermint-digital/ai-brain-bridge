@@ -296,6 +296,43 @@ if ($entfernt !== []) {
 }
 ```
 
+## Konto mit AI Brain verbinden — ohne Anmeldung
+
+Meldet ein Produkt seine Personen selbst an, braucht es trotzdem die
+Verbindung zur Person in AI Brain: Daran haengt, in wessen Namen KI-Funktionen
+handeln. Eine **angemeldete** Person verbindet ihr Konto ueber denselben
+Anmelde-Client und dieselbe Rueckruf-Adresse (`/auth/brain/callback`) — in AI
+Brain ist nichts neu einzutragen.
+
+```env
+AI_BRAIN_CONNECT_LOGIN=true                  # Vorgabe false
+AI_BRAIN_CONNECT_LOGIN_AFTER=/settings/ai-brain
+```
+
+Der Schalter ist unabhaengig von `AI_BRAIN_LOGIN`. Steht nur er an, gibt es
+keinen Anmeldestart, und der Rueckruf meldet niemanden an. Was mit der
+Kennung geschieht, entscheidet das Produkt:
+
+```php
+BrainLogin::verbindeUsing(function (User $user, array $person): ?string {
+    // $person = ['id' => …, 'name' => …, 'email' => …] aus /api/v1/me
+    if (User::where('ai_brain_user_id', $person['id'])->whereKeyNot($user->id)->exists()) {
+        return 'Dieses AI-Brain-Konto ist schon mit einer anderen Person verbunden.';
+    }
+
+    $user->forceFill(['ai_brain_user_id' => $person['id']])->save();
+
+    return null; // verbunden
+});
+```
+
+Start: `route('ai-brain-bridge.login.connect')` (natives `<a>`, der Weg fuehrt
+aus der Anwendung heraus). Verbunden wird nur, wenn beim Rueckruf noch dieselbe
+Person angemeldet ist, die begonnen hat. AI Brain laesst den Weg nur zu, wenn
+die Person im Verzeichnis fuer das Produkt freigeschaltet ist
+(`may_sign_in`) — beim Abschalten der Anmeldung den Client und die Haken
+also stehen lassen.
+
 ## Umschaltleiste zwischen den Systemen
 
 Ein Griff am oberen Bildschirmrand: Maus dagegen, und die Systeme fahren aus, in

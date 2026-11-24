@@ -29,6 +29,37 @@ use Peppermint\AiBrainBridge\Auth\BrainLogin;
 class BrainLoginController
 {
     /**
+     * Läuft gerade ein Verbinden statt einer Anmeldung? Dann führen Fehler
+     * zurück auf die Seite, von der aus verbunden wurde — nicht auf die
+     * Anmeldemaske, die eine angemeldete Person gar nicht sieht.
+     */
+    protected bool $verbinden = false;
+
+    /**
+     * Konto mit AI Brain verbinden (pm #10162): derselbe Weg wie die
+     * Anmeldung, aber nur für eine schon angemeldete Person, und der Rückruf
+     * meldet niemanden an, sondern übergibt dem Produkt die Kennung.
+     */
+    public function connect(Request $request): RedirectResponse
+    {
+        $config = $this->config();
+        $this->verbinden = true;
+
+        $user = Auth::guard($config['guard'])->user();
+
+        abort_if($user === null, 403);
+
+        if ($config['client_id'] === null || $config['client_id'] === '') {
+            return $this->zurueckMitFehler('Die Verbindung mit AI Brain ist hier nicht eingerichtet.');
+        }
+
+        $request->session()->put('ai_brain_login.zweck', 'verbinden');
+        $request->session()->put('ai_brain_login.verbinder', $user->getAuthIdentifier());
+
+        return $this->zuAiBrain($request, $config);
+    }
+
+    /**
      * Hin zu AI Brain — mit frischem Prüfwort (PKCE) und Zustand in der Sitzung.
      */
     public function redirect(Request $request): RedirectResponse
@@ -39,6 +70,19 @@ class BrainLoginController
             return $this->zurueckMitFehler('Die Anmeldung über AI Brain ist hier nicht eingerichtet.');
         }
 
+        // Ein früher begonnenes Verbinden ist mit dem Anmeldestart vorbei.
+        $request->session()->forget(['ai_brain_login.zweck', 'ai_brain_login.verbinder']);
+
+        return $this->zuAiBrain($request, $config);
+    }
+
+    /**
+     * Prüfwort (PKCE) und Zustand in die Sitzung, dann zu AI Brain.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    protected function zuAiBrain(Request $request, array $config): RedirectResponse
+    {
         $verifier = Str::random(96);
         $state = Str::random(40);
 
@@ -76,6 +120,16 @@ class BrainLoginController
         $verifier = $request->session()->pull('ai_brain_login.verifier');
         $state = $request->session()->pull('ai_brain_login.state');
         $ziel = $request->session()->pull('ai_brain_login.ziel');
+        $this->verbinden = $request->session()->pull('ai_brain_login.zweck') === 'verbinden';
+        $verbinder = $request->session()->pull('ai_brain_login.verbinder');
+
+        // Jeder Weg nur mit seinem eigenen Schalter. Der Rückruf ist auch
+        // registriert, wenn nur das Verbinden an ist — dann meldet er nicht an.
+        if ($this->verbinden ? ! $config['connect'] : ! $config['enabled']) {
+            return $this->zurueckMitFehler($this->verbinden
+                ? 'Die Verbindung mit AI Brain ist hier nicht eingeschaltet.'
+                : 'Die Anmeldung über AI Brain ist hier abgeschaltet.');
+        }
 
         if ($request->query('error') !== null) {
             // AI Brain hat abgelehnt — meist: kein Haken im Verzeichnis.
@@ -131,6 +185,11 @@ class BrainLoginController
         }
 
         $daten = (array) $person->json();
+
+        if ($this->verbinden) {
+            return $this->verbindeAngemeldete($config, $daten, $verbinder);
+        }
+
         $user = BrainLogin::resolve($daten);
 
         if ($user === null) {
@@ -154,6 +213,36 @@ class BrainLoginController
     }
 
     /**
+     * Die Person aus AI Brain an die angemeldete Person dieses Produkts
+     * hängen. Nur wenn noch dieselbe Person angemeldet ist, die das Verbinden
+     * begonnen hat — sonst landete die Kennung bei jemand anderem.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $person
+     */
+    protected function verbindeAngemeldete(array $config, array $person, mixed $verbinder): RedirectResponse
+    {
+        $user = Auth::guard($config['guard'])->user();
+
+        if ($user === null || $verbinder === null || (string) $user->getAuthIdentifier() !== (string) $verbinder) {
+            return $this->zurueckMitFehler('Die Verbindung wurde von einer anderen Sitzung begonnen. Bitte erneut verbinden.');
+        }
+
+        if (! isset($person['id']) || ! is_scalar($person['id']) || (string) $person['id'] === '') {
+            return $this->zurueckMitFehler('AI Brain konnte die angemeldete Person nicht nennen.');
+        }
+
+        $fehler = BrainLogin::verbinde($user, $person);
+
+        if ($fehler !== null) {
+            return $this->zurueckMitFehler($fehler);
+        }
+
+        return redirect()->to($config['connect_after'])
+            ->with('status', 'Dein Konto ist jetzt mit AI Brain verbunden.');
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function config(): array
@@ -168,6 +257,9 @@ class BrainLoginController
             'scope' => (string) ($login['scope'] ?? 'identity'),
             'guard' => (string) ($login['guard'] ?? 'web'),
             'after_login' => (string) ($login['after_login'] ?? '/'),
+            'enabled' => (bool) ($login['enabled'] ?? false),
+            'connect' => (bool) ($login['connect'] ?? false),
+            'connect_after' => (string) ($login['connect_after'] ?? '/'),
             'timeout' => (int) ($login['timeout'] ?? 15),
             'redirect_uri' => url((string) ($login['callback_path'] ?? '/auth/brain/callback')),
         ];
@@ -178,6 +270,12 @@ class BrainLoginController
      */
     protected function zurueckMitFehler(string $meldung): RedirectResponse
     {
+        if ($this->verbinden) {
+            return redirect()->to($this->config()['connect_after'])
+                ->withErrors(['ai_brain' => $meldung])
+                ->with('error', $meldung);
+        }
+
         $route = (string) config('ai-brain-bridge.login.failure_route', 'login');
 
         $ziel = \Illuminate\Support\Facades\Route::has($route)

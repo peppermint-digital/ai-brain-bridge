@@ -29,6 +29,11 @@ class BrainLogin
     protected static $resolver = null;
 
     /**
+     * @var (callable(Authenticatable, array<string, mixed>): ?string)|null
+     */
+    protected static $verbinder = null;
+
+    /**
      * @param  (callable(array<string, mixed>): (Authenticatable|null))|null  $resolver
      */
     public static function resolveUsing(?callable $resolver): void
@@ -39,6 +44,32 @@ class BrainLogin
     /**
      * @param  array<string, mixed>  $person  Antwort von /api/v1/me (id, name, email)
      */
+    /**
+     * Wie das Produkt eine angemeldete Person mit ihrem AI-Brain-Konto
+     * verbindet (pm #10162). Der Verbinder bekommt die Person dieses Produkts
+     * und das Profil aus AI Brain (`id`, `name`, `email`) und gibt `null`
+     * zurück, wenn verbunden wurde — sonst den Satz, der der Person den Grund
+     * nennt. Ohne Verbinder wird nie verbunden.
+     *
+     * @param  (callable(Authenticatable, array<string, mixed>): ?string)|null  $verbinder
+     */
+    public static function verbindeUsing(?callable $verbinder): void
+    {
+        static::$verbinder = $verbinder;
+    }
+
+    /**
+     * @param  array<string, mixed>  $person
+     */
+    public static function verbinde(Authenticatable $user, array $person): ?string
+    {
+        if (static::$verbinder === null) {
+            return 'Die Verbindung mit AI Brain ist hier nicht eingerichtet.';
+        }
+
+        return (static::$verbinder)($user, $person);
+    }
+
     public static function resolve(array $person): ?Authenticatable
     {
         if (static::$resolver !== null) {

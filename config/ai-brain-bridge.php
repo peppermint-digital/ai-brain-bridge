@@ -83,6 +83,25 @@ return [
         'button_label' => env('AI_BRAIN_LOGIN_LABEL', 'Mit AI Brain anmelden'),
 
         /*
+        | Konto mit AI Brain VERBINDEN (pm #10162) — ohne anzumelden.
+        |
+        | Meldet ein Produkt seine Personen selbst an, braucht es trotzdem die
+        | Verbindung zur Person in AI Brain, damit KI-Funktionen im Namen der
+        | richtigen Person laufen. Eine angemeldete Person startet unter
+        | `connect_path`, kommt über denselben Client und dieselbe Rückruf-
+        | Adresse zurück, und das Produkt entscheidet über
+        | `BrainLogin::verbindeUsing()`, was es mit der Kennung tut.
+        |
+        | Unabhängig von `enabled`: Der Rückruf bleibt registriert, solange
+        | einer der beiden Schalter an ist. Ist nur dieser an, meldet der
+        | Rückruf niemanden an. VORGABE AUS.
+        */
+        'connect' => filter_var(env('AI_BRAIN_CONNECT_LOGIN', false), FILTER_VALIDATE_BOOL),
+        'connect_path' => env('AI_BRAIN_CONNECT_LOGIN_START', '/auth/brain/verbinden'),
+        // Wohin nach dem Verbinden, Erfolg wie Fehlschlag.
+        'connect_after' => env('AI_BRAIN_CONNECT_LOGIN_AFTER', '/'),
+
+        /*
         | Der LOKALE Anmeldeweg (AI Brain #5346).
         |
         | 'an'        — unveraendert, jeder kann sich mit Passwort anmelden.

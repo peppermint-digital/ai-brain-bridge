@@ -13,6 +13,9 @@
         <testsuite name="Login">
             <directory>tests/Login</directory>
         </testsuite>
+        <testsuite name="Verbinden">
+            <directory>tests/Verbinden</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Peppermint\AiBrainBridge\Auth\BrainLogin;
 
@@ -140,4 +141,8 @@ it('nennt die Drossel beim Namen statt von Ablehnung zu sprechen', function () {
     $antwort->assertSessionHasErrors(['email' => 'Zu viele Anmeldeversuche in kurzer Zeit. Bitte eine Minute warten und erneut versuchen.']);
 
     expect(auth()->check())->toBeFalse();
+});
+
+it('bietet bei eingeschalteter Anmeldung den Verbinden-Weg nur mit eigenem Schalter an', function () {
+    expect(Route::has('ai-brain-bridge.login.connect'))->toBeFalse();
 });
