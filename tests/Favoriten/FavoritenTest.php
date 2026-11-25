@@ -229,9 +229,12 @@ it('nimmt fuer eine verbundene Person die bereitliegende Liste mit, fuer eine an
     expect(app(SwitcherController::class)->markup())->not->toContain('ai-brain&quot;');
 });
 
-it('registriert den Weg fuer die Favoriten, aber keinen in den Anmeldefluss', function () {
+it('registriert den Weg fuer die Favoriten, aber keinen in den Anmeldefluss von AI Brain', function () {
+    // `go` gibt es seit AI Brain #10249 auch ohne Anmeldeweg — er fuehrt dann
+    // auf die eigene Anmeldemaske (tests/OhneLogin). Den Fluss ueber AI Brain nie.
     expect(Route::has('ai-brain-bridge.switcher.pins'))->toBeTrue()
-        ->and(Route::has('ai-brain-bridge.switcher.go'))->toBeFalse();
+        ->and(Route::has('ai-brain-bridge.switcher.go'))->toBeTrue()
+        ->and(Route::has('ai-brain-bridge.login.redirect'))->toBeFalse();
 });
 
 it('loescht die Favoriten einer Person mit ihr', function () {

@@ -96,11 +96,68 @@ it('liefert die Leiste selbst aus', function () {
     $this->actingAs($this->person)->get('/ai-brain/switcher/app-switcher.js')->assertOk();
 });
 
-it('registriert keinen Weg in den Anmeldefluss und keinen Merkzettel', function () {
-    // `go` leitet ohne Sitzung in den Anmeldeweg — den es hier nicht gibt.
-    expect(Route::has('ai-brain-bridge.switcher.go'))->toBeFalse()
+it('registriert keinen Merkzettel, aber den Weg hinein', function () {
+    // Bis AI Brain #10249 fehlte hier auch `go`: Er leitete ohne Sitzung in
+    // den Anmeldeweg ueber AI Brain, den es hier nicht gibt. AI Brain verlinkt
+    // aber jedes Produkt auf `go` — der Knopf „Manager" endete auf einer 404.
+    expect(Route::has('ai-brain-bridge.switcher.go'))->toBeTrue()
         ->and(Route::has('ai-brain-bridge.switcher.pins'))->toBeFalse()
         ->and(Route::has('ai-brain-bridge.switcher.apps'))->toBeTrue();
+});
+
+/**
+ * Eine Anmelderoute wie im Produkt. Nach dem Hochfahren angelegt, deshalb die
+ * Namensliste neu aufbauen — sonst kennt `route('login')` sie nicht.
+ */
+function ohneLoginAnmelderouteAnlegen(): void
+{
+    Route::middleware('web')->get('/login', fn () => 'Anmeldemaske')->name('login');
+    Route::getRoutes()->refreshNameLookups();
+}
+
+it('fuehrt eine angemeldete Person sofort aufs Ziel', function () {
+    $this->actingAs($this->person)
+        ->get('/auth/brain/go?ziel=/projekte')
+        ->assertRedirect('/projekte');
+});
+
+it('fuehrt ohne Sitzung auf die eigene Anmeldemaske und merkt sich das Ziel', function () {
+    ohneLoginAnmelderouteAnlegen();
+
+    $this->get('/auth/brain/go?ziel=/projekte')
+        ->assertRedirect('/login')
+        ->assertSessionHas('url.intended', '/projekte');
+});
+
+it('merkt sich ohne Ziel die Startseite des Produkts', function () {
+    ohneLoginAnmelderouteAnlegen();
+    config()->set('ai-brain-bridge.login.after_login', '/dashboard');
+
+    $this->get('/auth/brain/go')
+        ->assertRedirect('/login')
+        ->assertSessionHas('url.intended', '/dashboard');
+});
+
+it('merkt sich nie ein fremdes Ziel', function () {
+    ohneLoginAnmelderouteAnlegen();
+    config()->set('ai-brain-bridge.login.after_login', '/dashboard');
+
+    $this->get('/auth/brain/go?ziel=https://boese.example/phish')
+        ->assertRedirect('/login')
+        ->assertSessionHas('url.intended', '/dashboard');
+});
+
+it('ueberlaesst ohne Anmelderoute die Anmeldung dem Ziel', function () {
+    $this->get('/auth/brain/go?ziel=/projekte')->assertRedirect('/projekte');
+});
+
+it('schickt ohne Anmeldeweg nie in den Anmeldefluss von AI Brain', function () {
+    ohneLoginAnmelderouteAnlegen();
+
+    $antwort = $this->get('/auth/brain/go?ziel=/projekte');
+
+    expect($antwort->headers->get('Location'))->not->toContain('brain.test')
+        ->and(Route::has('ai-brain-bridge.login.redirect'))->toBeFalse();
 });
 
 it('schreibt ohne angemeldete Person weiterhin nichts', function () {

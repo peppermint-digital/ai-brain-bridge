@@ -294,12 +294,14 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         $mitAnmeldeweg = (bool) config('ai-brain-bridge.login.enabled');
 
         Route::middleware($middleware)->group(function () use ($controller, $mitAnmeldeweg): void {
-            if ($mitAnmeldeweg) {
-                Route::get(
-                    (string) config('ai-brain-bridge.switcher.go_path', '/auth/brain/go'),
-                    [$controller, 'go'],
-                )->name('ai-brain-bridge.switcher.go');
-            }
+            // Immer, auch ohne Anmeldeweg (AI Brain #10249): AI Brain verlinkt
+            // jedes Produkt hierauf. Fehlt die Route, endet der Knopf in der
+            // Leiste von AI Brain auf einer 404. Ohne Anmeldeweg fuehrt `go`
+            // auf die eigene Anmeldemaske des Produkts.
+            Route::get(
+                (string) config('ai-brain-bridge.switcher.go_path', '/auth/brain/go'),
+                [$controller, 'go'],
+            )->name('ai-brain-bridge.switcher.go');
 
             Route::get(
                 (string) config('ai-brain-bridge.switcher.apps_path', '/ai-brain/switcher/apps'),

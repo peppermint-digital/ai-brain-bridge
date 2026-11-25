@@ -54,6 +54,16 @@ class SwitcherController
      * Das Ziel bestimmt das PRODUKT (`login.after_login`), nicht AI Brain. Sonst
      * muesste der Hub die Startseite jedes angebundenen Systems kennen und bei
      * jeder Umbenennung nachgezogen werden.
+     *
+     * ## Ohne Anmeldung ueber AI Brain (AI Brain #10249)
+     *
+     * AI Brain verlinkt JEDES Produkt mit Web-Adresse auf diese Route — es weiss
+     * nicht und soll nicht wissen, wie sich ein Produkt anmeldet. Hat ein Produkt
+     * die Anmeldung ueber AI Brain abgeschaltet (pm seit 24.11.2026), gab es die
+     * Route bis hierher gar nicht: Der Knopf „Manager" in der Leiste von AI Brain
+     * endete auf einer 404. Ohne Sitzung geht es dann auf die EIGENE
+     * Anmeldemaske des Produkts, mit dem Ziel als „intended" — nach der Anmeldung
+     * steht die Person dort, wo der Knopf hinwollte.
      */
     public function go(Request $request): RedirectResponse
     {
@@ -61,6 +71,18 @@ class SwitcherController
 
         if (Auth::guard((string) config('ai-brain-bridge.login.guard', 'web'))->check()) {
             return redirect()->to($ziel);
+        }
+
+        if (! config('ai-brain-bridge.login.enabled')) {
+            // Ohne benannte Anmelderoute uebernimmt die auth-Middleware des
+            // Ziels — sie kennt den Weg des Produkts besser als dieses Paket.
+            if (! Route::has('login')) {
+                return redirect()->to($ziel);
+            }
+
+            redirect()->setIntendedUrl($ziel);
+
+            return redirect()->route('login');
         }
 
         // Nicht angemeldet: durch den gewohnten Anmeldefluss, mit dem Ziel im
