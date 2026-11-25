@@ -360,6 +360,23 @@ Abschnitt). Keine Postfach-Kachel, und die Route `/auth/brain/go` gibt es nicht.
 Bis pm #10190 blieb die Leiste ohne Anmeldeweg ganz weg, bis pm #10219 ohne
 Favoriten und ohne AI Brain.
 
+### Am Telefon: Ausloeser in der Kopfleiste des Produkts
+
+Ohne weiteres Zutun sitzt die Leiste am Telefon (bis 767 px) als runder Knopf
+unten links. Liegen dort Bedienelemente der Seiten, legt das Produkt einen
+eigenen Ausloeser in seine Kopfleiste (pm #10219):
+
+```html
+<button type="button" data-peppermint-switcher-ausloeser hidden aria-label="Anwendung wechseln">…</button>
+```
+
+Die Leiste blendet ihn ein, sobald sie etwas zu zeigen hat, schaltet beim Tippen
+auf und zu, pflegt `aria-expanded` und klappt am Telefon unter ihm auf; der Knopf
+unten links entfaellt. Wichtig bei Tailwind: Eine `display`-Klasse schlaegt das
+Attribut `hidden`, also `[&[hidden]]:hidden` dazuschreiben. Ohne ein solches
+Element bleibt alles wie bisher. Programmatisch: `element.umschalten()` oder
+`document.dispatchEvent(new Event('peppermint-switcher:umschalten'))`.
+
 ### Favoriten (Stern) — im Produkt
 
 Seit pm #10219 haelt jedes System seine Favoriten selbst, in der Tabelle

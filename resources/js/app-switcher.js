@@ -40,7 +40,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.12.0';
+    const VERSION = '1.13.0';
 
     /**
      * Die Symbole, die ein Merkzettel tragen kann (#5320).
@@ -131,6 +131,30 @@
      */
     const POSTFACH_SYMBOL = '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>';
 
+    /**
+     * Ein Ausloeser des Produkts (pm #10219).
+     *
+     * Am Telefon sass die Leiste als schwebender Knopf unten links — und lag
+     * dort auf den Bedienelementen der Seiten. Bastian (25.11.2026): „Koennen
+     * wir den irgendwie oben mit in die Leiste packen, weil da unten
+     * ueberlagert jetzt immer Bedienelemente von anderen Sachen."
+     *
+     * Ein Produkt legt dafuer irgendwo in seine Kopfleiste ein Element mit
+     * diesem Attribut, etwa einen Knopf mit Symbol, anfangs `hidden`:
+     *
+     *     <button type="button" data-peppermint-switcher-ausloeser hidden
+     *             aria-label="Anwendung wechseln">…</button>
+     *
+     * Die Leiste uebernimmt den Rest: Sie blendet ihn ein, sobald sie etwas
+     * zu zeigen hat, schaltet beim Tippen auf und zu, pflegt `aria-expanded`
+     * und oeffnet sich am Telefon UNTER ihm statt unten links. Gibt es kein
+     * solches Element, bleibt alles wie bisher.
+     *
+     * Wer lieber selbst ausloest: `element.umschalten()` oder auf `document`
+     * das Ereignis `peppermint-switcher:umschalten`.
+     */
+    const AUSLOESER = '[data-peppermint-switcher-ausloeser]';
+
     /** Lucide `plus` — fuer das Anpinnen. */
     const PLUS_SYMBOL = '<path d="M5 12h14"/><path d="M12 5v14"/>';
 
@@ -186,13 +210,42 @@
 
             this.aufTaste = (e) => this.taste(e);
             this.aufKlickAussen = (e) => {
-                if (this.offen && !e.composedPath().includes(this)) {
+                // Der Ausloeser des Produkts ist nicht „aussen": Sonst schloesse
+                // das Tippen auf ihn die Leiste, und der Klick darauf oeffnete
+                // sie gleich wieder.
+                if (this.offen && !e.composedPath().some((el) => el === this || this.istAusloeser(el))) {
                     this.zumachen();
                 }
+            };
+            this.aufAusloeser = (e) => {
+                const ausloeser = e.target instanceof Element ? e.target.closest(AUSLOESER) : null;
+
+                if (ausloeser) {
+                    e.preventDefault();
+                    this.umschalten();
+                }
+            };
+            this.aufUmschalten = () => this.umschalten();
+            // Zweimal: sofort und im naechsten Bild — nach `inertia:navigate`
+            // steht die neue Kopfleiste womoeglich erst einen Takt spaeter.
+            this.ausloeserSuchen = () => {
+                this.ausloeserPflegen();
+                requestAnimationFrame(() => this.ausloeserPflegen());
             };
 
             document.addEventListener('keydown', this.aufTaste);
             document.addEventListener('pointerdown', this.aufKlickAussen);
+            document.addEventListener('click', this.aufAusloeser);
+            document.addEventListener('peppermint-switcher:umschalten', this.aufUmschalten);
+
+            // Der Ausloeser steht in der Kopfleiste des Produkts, und die
+            // entsteht oft erst NACH der Leiste (React rendert spaeter, Inertia
+            // tauscht sie beim Navigieren aus). Deshalb zu diesen Zeitpunkten
+            // nachsehen — ohne Dauerbeobachtung des ganzen Dokuments.
+            document.addEventListener('DOMContentLoaded', this.ausloeserSuchen);
+            window.addEventListener('load', this.ausloeserSuchen);
+            document.addEventListener('inertia:navigate', this.ausloeserSuchen);
+            requestAnimationFrame(this.ausloeserSuchen);
 
             this.themaFolgen();
             this.laden();
@@ -217,6 +270,11 @@
         disconnectedCallback() {
             document.removeEventListener('keydown', this.aufTaste);
             document.removeEventListener('pointerdown', this.aufKlickAussen);
+            document.removeEventListener('click', this.aufAusloeser);
+            document.removeEventListener('peppermint-switcher:umschalten', this.aufUmschalten);
+            document.removeEventListener('DOMContentLoaded', this.ausloeserSuchen);
+            window.removeEventListener('load', this.ausloeserSuchen);
+            document.removeEventListener('inertia:navigate', this.ausloeserSuchen);
             this.themaWaechter?.disconnect();
             clearTimeout(this.schliessUhr);
             clearInterval(this.postfachUhr);
@@ -374,6 +432,7 @@
             const zeigen = kacheln.length > 1 || this.pins.length > 0 || this.hatPostfach();
 
             this.wrap.hidden = !zeigen;
+            this.ausloeserPflegen();
 
             if (!zeigen) {
                 return;
@@ -1083,8 +1142,60 @@
 
             this.offen = true;
             this.wrap.classList.add('offen');
+            this.ausloeserPflegen();
             this.leiste.hidden = false;
             this.vorwaermen();
+        }
+
+        /** Auf, wenn zu — zu, wenn auf. Fuer den Ausloeser des Produkts. */
+        umschalten() {
+            if (this.offen) {
+                this.zumachen();
+
+                return;
+            }
+
+            this.aufmachen();
+        }
+
+        istAusloeser(el) {
+            return el instanceof Element && el.matches(AUSLOESER);
+        }
+
+        /** Der Ausloeser, den man gerade sieht — oder null. */
+        sichtbarerAusloeser() {
+            return [...document.querySelectorAll(AUSLOESER)]
+                .find((el) => !el.hidden && el.getClientRects().length > 0) ?? null;
+        }
+
+        /**
+         * Ausloeser des Produkts auf den Stand der Leiste bringen.
+         *
+         * - Hat die Leiste nichts zu zeigen, bleibt er verborgen — ein Knopf,
+         *   der nichts oeffnet, waere ein grauer Fleck.
+         * - `aria-expanded` sagt Vorlesern, ob die Leiste offen ist.
+         * - Gibt es einen, traegt der Wirt die Klasse `mit-ausloeser`: Am
+         *   Telefon faellt dann der schwebende Knopf unten links weg, und die
+         *   Leiste haengt unter dem Ausloeser (`--ausloeser-unten`).
+         */
+        ausloeserPflegen() {
+            if (!this.wrap) {
+                return;
+            }
+
+            const alle = [...document.querySelectorAll(AUSLOESER)];
+            this.classList.toggle('mit-ausloeser', alle.length > 0);
+
+            for (const el of alle) {
+                el.hidden = this.wrap.hidden;
+                el.setAttribute('aria-expanded', this.offen ? 'true' : 'false');
+            }
+
+            const sichtbar = this.sichtbarerAusloeser();
+
+            if (sichtbar) {
+                this.style.setProperty('--ausloeser-unten', `${Math.round(sichtbar.getBoundingClientRect().bottom + 6)}px`);
+            }
         }
 
         /**
@@ -1130,6 +1241,7 @@
 
             this.offen = false;
             this.wrap.classList.remove('offen');
+            this.ausloeserPflegen();
 
             // Erst nach dem Einfahren aus dem Baum nehmen, sonst springt die
             // Leiste weg, statt zu verschwinden.
@@ -1152,7 +1264,7 @@
         taste(e) {
             if (e.key === 'Escape' && this.offen) {
                 this.zumachen();
-                this.griff.focus?.();
+                (this.sichtbarerAusloeser() ?? this.griff).focus?.();
 
                 return;
             }
@@ -1763,6 +1875,29 @@
            Bild. Am Telefon traegt jede Kachel ohnehin ihre Beschriftung ueber
            'aria-label'. */
         .hinweis { display: none; }
+
+        /*
+         * Mit Ausloeser in der Kopfleiste (pm #10219): kein schwebender Knopf
+         * unten links mehr, der auf den Bedienelementen der Seite liegt. Die
+         * Leiste klappt unter dem Ausloeser auf, am linken Rand, so breit wie
+         * noetig und hoechstens so breit wie das Fenster.
+         */
+        :host(.mit-ausloeser) {
+            top: var(--ausloeser-unten, 64px);
+            bottom: auto;
+            left: 12px;
+        }
+
+        :host(.mit-ausloeser) .wrap { flex-direction: column; }
+        :host(.mit-ausloeser) .griff { display: none; }
+
+        :host(.mit-ausloeser) .leiste {
+            margin-top: 0;
+            margin-bottom: 0;
+            transform: translateY(-8px);
+        }
+
+        :host(.mit-ausloeser) .wrap.offen .leiste { transform: translateY(0); }
     }
 
     @media (prefers-reduced-motion: reduce) {
