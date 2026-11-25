@@ -1335,18 +1335,24 @@
 <style>
     /*
      * Die Stil-Schalter. Ein Produkt kann jeden davon von aussen setzen
-     * (peppermint-app-switcher { --akzent: … }). Die Werte folgen seit
-     * 1.12.0 (pm #10219) der neutralen Palette von shadcn/ui (zinc): Flaeche,
-     * feiner Rand, --akzent fuer Zeigen und Aktiv, --ring fuer den Fokus.
+     * (peppermint-app-switcher { --akzent: … }).
+     *
+     * Seit pm #10236 lesen sie die shadcn-Variablen des Produkts — die erben
+     * in den Shadow DOM hinein, und so folgt die Leiste dem Theme, das das
+     * Produkt gerade zeigt. Der Wert hinter dem Komma ist der bisherige
+     * (zinc, seit 1.12.0, pm #10219): der Rueckfall fuer eine Seite ohne
+     * diese Variablen. Bewacht von tests/Unit/SwitcherFarbenTest.php.
      */
     :host {
-        --grund: #ffffff;
-        --rand: #e4e4e7;
-        --griff: rgba(9, 9, 11, 0.22);
-        --schrift: #09090b;
-        --gedaempft: #71717a;
-        --akzent: #f4f4f5;
-        --ring: rgba(161, 161, 170, 0.55);
+        --grund: var(--background, #ffffff);
+        --rand: var(--border, #e4e4e7);
+        --griff: color-mix(in oklch, var(--foreground, #09090b) 22%, transparent);
+        --schrift: var(--foreground, #09090b);
+        --gedaempft: var(--muted-foreground, #71717a);
+        --akzent: var(--accent, #f4f4f5);
+        /* Nicht var(--ring): Der Name gehoert hier der Leiste selbst, ein
+           Verweis darauf waere ein Zyklus und damit ungueltig. */
+        --ring: color-mix(in oklch, var(--muted-foreground, #a1a1aa) 55%, transparent);
         --schatten: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
 
         position: fixed;
@@ -1354,17 +1360,17 @@
         left: 50%;
         transform: translateX(-50%);
         z-index: 2147483000;
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-family: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
     }
 
     :host(.dunkel) {
-        --grund: #09090b;
-        --rand: rgba(255, 255, 255, 0.1);
-        --griff: rgba(255, 255, 255, 0.3);
-        --schrift: #fafafa;
-        --gedaempft: #a1a1aa;
-        --akzent: #27272a;
-        --ring: rgba(113, 113, 122, 0.6);
+        --grund: var(--background, #09090b);
+        --rand: var(--border, rgba(255, 255, 255, 0.1));
+        --griff: color-mix(in oklch, var(--foreground, #fafafa) 30%, transparent);
+        --schrift: var(--foreground, #fafafa);
+        --gedaempft: var(--muted-foreground, #a1a1aa);
+        --akzent: var(--accent, #27272a);
+        --ring: color-mix(in oklch, var(--muted-foreground, #71717a) 60%, transparent);
         --schatten: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
     }
 
@@ -1551,7 +1557,7 @@
         align-items: center;
         justify-content: center;
         border-radius: 9px;
-        background: #dc2626;
+        background: var(--destructive, #dc2626);
         color: #ffffff;
         font-size: 10px;
         font-weight: 700;
