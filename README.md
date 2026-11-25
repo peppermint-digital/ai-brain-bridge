@@ -385,7 +385,7 @@ Seit pm #10219 haelt jedes System seine Favoriten selbst, in der Tabelle
 ```env
 AI_BRAIN_SWITCHER_PINS_STORE=local   # Vorgabe: local ohne AI_BRAIN_LOGIN, brain mit
 AI_BRAIN_SWITCHER_PINS_MAX=12
-AI_BRAIN_SWITCHER_FARBE=#10b981      # Streifen; ohne Angabe aus dem Produkt-Slug
+AI_BRAIN_SWITCHER_FARBE="#10b981"    # Punkt; ohne Angabe aus dem Produkt-Slug. Anfuehrungszeichen: sonst liest dotenv # als Kommentar
 ```
 
 Nur Adressen dieses Produkts (`APP_URL`), jede nur einmal je Person, Symbol aus
