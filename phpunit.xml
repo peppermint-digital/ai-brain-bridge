@@ -19,6 +19,9 @@
         <testsuite name="Verbinden">
             <directory>tests/Verbinden</directory>
         </testsuite>
+        <testsuite name="Favoriten">
+            <directory>tests/Favoriten</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>

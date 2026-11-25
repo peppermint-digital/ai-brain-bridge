@@ -179,6 +179,48 @@ return [
         'go_path' => env('AI_BRAIN_SWITCHER_GO', '/auth/brain/go'),
         'pins_path' => env('AI_BRAIN_SWITCHER_PINS', '/ai-brain/switcher/pins'),
         'middleware' => ['web'],
+
+        // Favoriten (Stern) — wo sie liegen (pm #10219).
+        //
+        // 'local' — im Produkt selbst, Tabelle `switcher_pins`, fuer jede
+        //           angemeldete Person. Jedes System haelt seine eigenen.
+        // 'brain' — in AI Brain, durchgereicht (der Weg bis pm #10219). Nur
+        //           mit gemeinsamer Anmeldung.
+        // null    — Vorgabe: 'brain' mit gemeinsamer Anmeldung, sonst 'local'.
+        //           Ein Produkt, das ueber AI Brain anmeldet, bleibt also gleich.
+        'pins' => [
+            'store' => env('AI_BRAIN_SWITCHER_PINS_STORE'),
+            // So viele passen in die Leiste — derselbe Wert wie in AI Brain.
+            'hoechstens' => (int) env('AI_BRAIN_SWITCHER_PINS_MAX', 12),
+            // Farbe des Streifens. Ohne Angabe aus dem Produkt-Slug, nach
+            // derselben Palette wie AI Brain.
+            'farbe' => env('AI_BRAIN_SWITCHER_FARBE'),
+            // Tabelle der Personen, an der die Favoriten haengen (Fremdschluessel,
+            // mit der Person geloescht).
+            'personen_tabelle' => env('AI_BRAIN_SWITCHER_PERSONEN_TABELLE', 'users'),
+        ],
+    ],
+
+    /*
+    | Konto mit AI Brain verbunden (pm #10219) — EIN Schalter fuer alle Pakete.
+    |
+    | Funktionen, die es nur mit AI Brain gibt (der AI-Brain-Link in der Leiste,
+    | spaeter Persoenliches in Kalender, Meldungen, Postfach), fragen genau hier:
+    |
+    |     Gate::allows('ai-brain.verbunden')       // ohne Abhaengigkeit auf dieses Paket
+    |     AiBrain::istVerbunden($person)           // mit
+    |
+    | Die Vorgabe-Umsetzung: mit gemeinsamer Anmeldung (login.enabled) ist jede
+    | angemeldete Person verbunden — sie kommt ja aus AI Brain. Sonst entscheidet
+    | eine Spalte an der Person (`spalte`, gesetzt beim Verbinden ueber
+    | /auth/brain/verbinden). Ein Produkt mit eigener Regel bindet den Vertrag
+    | \Peppermint\AiBrainBridge\Kontoverbindung selbst.
+    */
+    'verbindung' => [
+        'spalte' => env('AI_BRAIN_VERBINDUNG_SPALTE', 'ai_brain_user_id'),
+        // Mit welcher Adresse die Bruecke fuer eine verbundene Person in AI
+        // Brain auftritt — dort darf sie anders heissen als hier.
+        'adresse_spalte' => env('AI_BRAIN_VERBINDUNG_ADRESSE_SPALTE', 'ai_brain_email'),
     ],
 
     /*

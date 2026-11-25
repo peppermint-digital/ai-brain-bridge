@@ -3,6 +3,7 @@
 namespace Peppermint\AiBrainBridge;
 
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Log\Events\MessageLogged;
@@ -17,6 +18,7 @@ use Peppermint\AiBrainBridge\Auth\RoleAssignment;
 use Peppermint\AiBrainBridge\Auth\SitzungenBeenden;
 use Peppermint\AiBrainBridge\Config\BridgeConfig;
 use Peppermint\AiBrainBridge\Console\ConnectCommand;
+use Peppermint\AiBrainBridge\Console\FavoritenUebernehmenCommand;
 use Peppermint\AiBrainBridge\Console\PushHealthCommand;
 use Peppermint\AiBrainBridge\Console\SelftestCommand;
 use Peppermint\AiBrainBridge\Events\AiBrainEventReceived;
@@ -33,6 +35,7 @@ use Peppermint\AiBrainBridge\Http\Middleware\NutzerverwaltungRiegel;
 use Peppermint\AiBrainBridge\Http\Middleware\BeschraenkeKanalWerkzeuge;
 use Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser;
 use Peppermint\AiBrainBridge\Http\Middleware\VerifyAiBrainSignature;
+use Peppermint\AiBrainBridge\Switcher\Favoriten;
 
 class AiBrainBridgeServiceProvider extends ServiceProvider
 {
@@ -59,6 +62,10 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
             (string) config('ai-brain-bridge.base_url'),
         ));
 
+        // Konto mit AI Brain verbunden? (pm #10219) — `bindIf`, damit ein
+        // Produkt mit eigener Regel gewinnt, egal in welcher Reihenfolge.
+        $this->app->bindIf(Kontoverbindung::class, SpaltenKontoverbindung::class);
+
         $this->app->singleton(AiBrainManager::class, fn ($app) => new AiBrainManager(
             (array) config('ai-brain-bridge'),
             $app->make(OAuthTokenProvider::class),
@@ -77,6 +84,14 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         // Tabellen schaden nicht, ein Loeschen waere eine Schema-Aenderung
         // ueberall (#5400).
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
+        // Favoriten im Produkt (pm #10219): Die Tabelle entsteht nur in dem
+        // Betrieb, der sie braucht. Wer auf `local` umstellt, migriert danach.
+        if (config('ai-brain-bridge.switcher.enabled') && Favoriten::lokal()) {
+            $this->loadMigrationsFrom(__DIR__.'/../database/switcher-migrations');
+        }
+
+        $this->registerKontoverbindung();
 
         // Wer darf aus AI Brain heraus Rollen setzen? (#5314)
         //
@@ -126,6 +141,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
                 SelftestCommand::class,
                 ConnectCommand::class,
                 PushHealthCommand::class,
+                FavoritenUebernehmenCommand::class,
             ]);
         }
 
@@ -295,15 +311,40 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
                 [$controller, 'script'],
             )->name('ai-brain-bridge.switcher.script');
 
-            // Merkzettel (#5320) — durchgereicht an AI Brain, entschieden dort.
-            // Nur mit Anmeldeweg: Angepinnt werden Adressen im Verbund.
-            if ($mitAnmeldeweg) {
+            // Favoriten (#5320): mit Anmeldeweg durchgereicht an AI Brain,
+            // im Betrieb `local` im Produkt selbst (pm #10219).
+            if ($mitAnmeldeweg || Favoriten::lokal()) {
                 Route::match(['post', 'patch', 'delete'],
                     (string) config('ai-brain-bridge.switcher.pins_path', '/ai-brain/switcher/pins'),
                     [$controller, 'pins'],
                 )->name('ai-brain-bridge.switcher.pins');
             }
         });
+    }
+
+    /**
+     * Der Schalter „Konto mit AI Brain verbunden" als Faehigkeit (pm #10219).
+     *
+     * Ein Gate, damit andere Pakete (calendar, notifications, mailbox …) ihn
+     * fragen koennen, ohne die Bruecke zu kennen: `Gate::allows(
+     * 'ai-brain.verbunden')`. Ohne Bruecke ist die Faehigkeit nicht definiert
+     * und Laravel antwortet `false` — ohne Verbindung keine Funktion.
+     *
+     * `Gate::has` davor wie bei `ai-brain.assign-roles`: Ein Produkt, das die
+     * Faehigkeit selbst definiert, wird nicht ueberschrieben. Der bessere Weg
+     * fuer eine eigene Regel ist aber, {@see Kontoverbindung} zu binden — dann
+     * folgen Gate, Fassade und Leiste derselben Stelle.
+     */
+    protected function registerKontoverbindung(): void
+    {
+        if (Gate::has('ai-brain.verbunden')) {
+            return;
+        }
+
+        Gate::define(
+            'ai-brain.verbunden',
+            fn (?Authenticatable $person = null): bool => $this->app->make(Kontoverbindung::class)->istVerbunden($person),
+        );
     }
 
     /**

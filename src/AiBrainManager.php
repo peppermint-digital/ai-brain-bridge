@@ -2,6 +2,7 @@
 
 namespace Peppermint\AiBrainBridge;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Event;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
 use Peppermint\AiBrainBridge\Channels\ChannelClient;
@@ -128,9 +129,35 @@ class AiBrainManager
             return null;
         }
 
+        // Seit pm #10219 fragt der Default die Kontoverbindung: Eine
+        // verbundene Person tritt mit der Adresse ihres AI-Brain-Kontos auf,
+        // alle anderen wie bisher mit ihrer eigenen.
+        if ($user instanceof Authenticatable && app()->bound(Kontoverbindung::class)) {
+            return app(Kontoverbindung::class)->adresse($user);
+        }
+
         $email = is_object($user) && isset($user->email) ? $user->email : null;
 
         return is_string($email) ? $email : null;
+    }
+
+    /**
+     * Ist das Konto mit AI Brain verbunden? (pm #10219)
+     *
+     * Ohne Angabe die angemeldete Person. Derselbe Schalter wie das Gate
+     * `ai-brain.verbunden` — siehe {@see Kontoverbindung}.
+     */
+    public function istVerbunden(?Authenticatable $person = null): bool
+    {
+        if ($person === null && function_exists('auth')) {
+            try {
+                $person = auth()->user();
+            } catch (\Throwable) {
+                $person = null;
+            }
+        }
+
+        return app(Kontoverbindung::class)->istVerbunden($person);
     }
 
     // ── MCP (Schiene 1) ──────────────────────────────────────────────────

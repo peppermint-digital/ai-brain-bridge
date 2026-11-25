@@ -1,5 +1,6 @@
 <?php
 
+use Peppermint\AiBrainBridge\Tests\FavoritenTestCase;
 use Peppermint\AiBrainBridge\Tests\LoginTestCase;
 use Peppermint\AiBrainBridge\Tests\OhneLoginTestCase;
 use Peppermint\AiBrainBridge\Tests\TestCase;
@@ -16,3 +17,6 @@ uses(OhneLoginTestCase::class)->in('OhneLogin');
 
 // Konto verbinden ohne gemeinsame Anmeldung — eigener Boot-Zustand.
 uses(VerbindenTestCase::class)->in('Verbinden');
+
+// Favoriten im Produkt, ohne gemeinsame Anmeldung (pm #10219).
+uses(FavoritenTestCase::class)->in('Favoriten');

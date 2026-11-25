@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static array anbieterMitGrund(string $capability, ?string $actingAs = null, ?string $channel = null)
  * @method static \Peppermint\AiBrainBridge\AiBrainManager resolveActingUserUsing(?callable $resolver)
  * @method static mixed asService(callable $callback)
+ * @method static bool istVerbunden(?\Illuminate\Contracts\Auth\Authenticatable $person = null)
+ * @method static ?string actingUserEmail()
  * @method static array actingUserHeaders(?string $behauptet = null, ?string $channel = null)
  * @method static \Peppermint\AiBrainBridge\AiBrainManager resolveInboundUserUsing(?callable $resolver)
  * @method static mixed resolveInboundUser(string $email)

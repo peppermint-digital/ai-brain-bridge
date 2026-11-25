@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Route;
 use Peppermint\AiBrainBridge\Auth\OAuthTokenProvider;
 use Peppermint\AiBrainBridge\Config\BridgeConfig;
 use Peppermint\AiBrainBridge\Facades\AiBrain;
+use Peppermint\AiBrainBridge\Kontoverbindung;
+use Peppermint\AiBrainBridge\Switcher\AiBrainLeiste;
+use Peppermint\AiBrainBridge\Switcher\Favoriten;
 use Peppermint\AiBrainBridge\Switcher\LokaleEintraege;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -104,14 +107,20 @@ class SwitcherController
             return response()->json(['apps' => [], 'pins' => []]);
         }
 
-        // Ohne Anmeldeweg fragt die Leiste AI Brain nicht (pm #10190): Die
-        // Systeme von dort fuehrten auf Anmeldemasken. Es bleiben die
-        // Eintraege des Produkts.
+        // AI Brain wird nur fuer ein verbundenes Konto gefragt (pm #10219) —
+        // und die Frage steht VOR dem Abruf, nicht als Filter danach. Ohne
+        // Verbindung bleiben die Eintraege und Favoriten des Produkts.
         $nutzlast = ['apps' => [], 'pins' => []];
 
-        if (self::mitAnmeldeweg()) {
+        if ($this->verbunden($user)) {
             $dauer = (int) config('ai-brain-bridge.switcher.cache_seconds', 300);
             $nutzlast = Cache::remember($this->schluessel($user), $dauer, fn (): array => $this->holen());
+        }
+
+        // Favoriten im Produkt (pm #10219): frisch aus der eigenen Tabelle,
+        // nie aus dem Zwischenspeicher und nie die aus AI Brain.
+        if (Favoriten::lokal()) {
+            $nutzlast['pins'] = $this->favoriten($user);
         }
 
         // Erst NACH dem Zwischenspeicher: Die Eintraege des Produkts gehoeren
@@ -144,6 +153,10 @@ class SwitcherController
             return response()->json(['message' => 'Nicht angemeldet.'], 401);
         }
 
+        if (Favoriten::lokal()) {
+            return $this->lokalerFavorit($request, $user);
+        }
+
         $basis = rtrim((string) config('ai-brain-bridge.base_url'), '/');
         $methode = match (true) {
             $request->isMethod('delete') => 'delete',
@@ -166,6 +179,77 @@ class SwitcherController
         Cache::forget($this->schluessel($user));
 
         return response()->json($antwort->json() ?? [], $antwort->status());
+    }
+
+    /**
+     * Anlegen, Umbenennen, Entfernen eines Favoriten im Produkt (pm #10219).
+     *
+     * Dieselben Antworten wie AI Brain (`{pin: …}`, 422 mit `message`, 404),
+     * damit die Leiste nicht unterscheiden muss, wo ihre Favoriten liegen.
+     */
+    protected function lokalerFavorit(Request $request, Authenticatable $user): JsonResponse
+    {
+        $favoriten = app(Favoriten::class);
+
+        if ($request->isMethod('delete')) {
+            $daten = $request->validate(['id' => ['required', 'integer']]);
+            $favoriten->entfernen($user, (int) $daten['id']);
+
+            return response()->json(['ok' => true]);
+        }
+
+        if ($request->isMethod('patch')) {
+            $daten = $request->validate([
+                'id' => ['required', 'integer'],
+                'label' => ['required', 'string', 'max:255'],
+                'symbol' => ['nullable', 'string', 'max:32'],
+            ]);
+
+            $pin = $favoriten->aendern($user, (int) $daten['id'], $daten['label'], $request->exists('symbol'), $daten['symbol'] ?? null);
+
+            return $pin === null
+                ? response()->json(['message' => 'Diesen Favoriten gibt es nicht.'], 404)
+                : response()->json(['pin' => $pin]);
+        }
+
+        $daten = $request->validate([
+            'url' => ['required', 'string', 'url', 'max:2048'],
+            'label' => ['required', 'string', 'max:255'],
+            'symbol' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        $ergebnis = $favoriten->anlegen($user, $daten['url'], $daten['label'], $daten['symbol'] ?? null);
+
+        return isset($ergebnis['fehler'])
+            ? response()->json(['message' => $ergebnis['fehler']], 422)
+            : response()->json($ergebnis);
+    }
+
+    /**
+     * Die Favoriten der Person aus dem Produkt — fail-safe wie die ganze
+     * Leiste: Fehlt die Tabelle (Deploy vor `migrate`), keine Favoriten statt
+     * einer Seite, die nicht laedt.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function favoriten(Authenticatable $user): array
+    {
+        try {
+            return app(Favoriten::class)->liste($user);
+        } catch (\Throwable $e) {
+            Log::warning('Umschaltleiste: Favoriten nicht gelesen', ['fehler' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Ist die Person mit AI Brain verbunden? Davon haengt ab, ob die Leiste
+     * AI Brain ueberhaupt fragt (pm #10219) — {@see Kontoverbindung}.
+     */
+    protected function verbunden(Authenticatable $user): bool
+    {
+        return app(Kontoverbindung::class)->istVerbunden($user);
     }
 
     /**
@@ -217,35 +301,8 @@ class SwitcherController
      */
     protected function holen(): array
     {
-        $basis = rtrim((string) config('ai-brain-bridge.base_url'), '/');
-
-        try {
-            $antwort = Http::withToken(app(OAuthTokenProvider::class)->token())
-                ->withHeaders(AiBrain::actingUserHeaders())
-                ->acceptJson()
-                ->timeout((int) config('ai-brain-bridge.switcher.timeout', 8))
-                ->get($basis.'/api/v1/users/me/apps', [
-                    'aktuell' => BridgeConfig::load()['source']
-                        ?? config('ai-brain-bridge.source'),
-                ]);
-
-            if (! $antwort->successful()) {
-                Log::warning('Umschaltleiste: AI Brain antwortete nicht mit Erfolg', [
-                    'status' => $antwort->status(),
-                ]);
-
-                return ['apps' => [], 'pins' => []];
-            }
-
-            return [
-                'apps' => is_array($antwort->json('apps')) ? array_values($antwort->json('apps')) : [],
-                'pins' => is_array($antwort->json('pins')) ? array_values($antwort->json('pins')) : [],
-            ];
-        } catch (\Throwable $e) {
-            Log::warning('Umschaltleiste: AI Brain nicht erreichbar', ['fehler' => $e->getMessage()]);
-
-            return ['apps' => [], 'pins' => []];
-        }
+        // Faellt AI Brain aus, eine leere Liste — die Leiste ist Beiwerk.
+        return app(AiBrainLeiste::class)->abrufen() ?? ['apps' => [], 'pins' => []];
     }
 
     /**
@@ -273,13 +330,15 @@ class SwitcherController
         }
 
         $mitAnmeldeweg = self::mitAnmeldeweg();
+        $verbunden = $this->verbunden($user);
+        $lokaleFavoriten = Favoriten::lokal();
 
         // Marke, die sich mit der Datei aendert — sonst bleibt eine Stunde
         // lang (`max-age`) die alte Fassung im Browser.
         $script = e(route('ai-brain-bridge.switcher.script').'?v='.$this->fassung());
         $endpunkt = e(route('ai-brain-bridge.switcher.apps'));
         // Ohne `pin-endpoint` blendet die Leiste das Anpinnen selbst aus.
-        $pins = $mitAnmeldeweg ? ' pin-endpoint="'.e(route('ai-brain-bridge.switcher.pins')).'"' : '';
+        $pins = ($mitAnmeldeweg || $lokaleFavoriten) ? ' pin-endpoint="'.e(route('ai-brain-bridge.switcher.pins')).'"' : '';
         $slug = e((string) (BridgeConfig::load()['source']
             ?? config('ai-brain-bridge.source')));
 
@@ -296,7 +355,10 @@ class SwitcherController
         // Steht nichts bereit, faellt das Attribut weg und die Leiste holt die
         // Liste nach dem Laden ueber `endpoint`. Das kostet ein Nachpoppen —
         // aber nur beim ersten Mal, und es haelt die Seite frei.
-        $bereit = $mitAnmeldeweg ? Cache::get($this->schluessel($user)) : null;
+        //
+        // Nur fuer ein verbundenes Konto (pm #10219): Eine bereitliegende
+        // Liste ist die Antwort von AI Brain fuer diese Person.
+        $bereit = $verbunden ? Cache::get($this->schluessel($user)) : null;
 
         // Die Eintraege des Produkts stehen immer sofort bereit — sie kosten
         // kein Netz. Fehlt die Liste von AI Brain, geht NUR `lokal` mit (ohne
@@ -304,10 +366,22 @@ class SwitcherController
         // Speicher und fragt danach wie bisher nach.
         $lokal = $this->lokal($user, request());
 
-        // Ohne Anmeldeweg gibt es nur die eigenen Eintraege. Hat das Produkt
+        // Ohne Verbindung gibt es nur die eigenen Eintraege. Hat das Produkt
         // keine (oder sieht diese Person keinen), gaebe es eine leere Leiste.
-        if (! $mitAnmeldeweg && ($lokal === null || $lokal === [])) {
+        if (! $verbunden && ($lokal === null || $lokal === [])) {
             return '';
+        }
+
+        // Ohne Verbindung AUSDRUECKLICH keine Systeme: Fehlt `apps`, nimmt
+        // die Leiste sie aus dem Sitzungsspeicher des Browsers — womoeglich
+        // eine Liste aus der Zeit vor dem Trennen, mit AI Brain darin.
+        if (! $verbunden) {
+            $bereit = ['apps' => []];
+        }
+
+        // Die Favoriten des Produkts kosten kein Netz — sie stehen immer bereit.
+        if ($lokaleFavoriten) {
+            $bereit = [...(is_array($bereit) ? $bereit : []), 'pins' => $this->favoriten($user)];
         }
 
         if ($lokal !== null) {

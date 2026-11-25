@@ -235,7 +235,10 @@
 
                 sofort = {
                     apps: gespeichert?.apps ?? [],
-                    pins: gespeichert?.pins ?? [],
+                    // Liegen die Favoriten im Produkt (pm #10219), schickt der
+                    // Server sie immer mit — dann gelten SEINE, nicht ein
+                    // alter Stand aus dem Speicher.
+                    pins: sofort.mitPins ? sofort.pins : (gespeichert?.pins ?? []),
                     lokal: sofort.lokal,
                 };
             }
@@ -312,6 +315,7 @@
                     // Nur die Eintraege des Produkts, ohne die Liste von AI
                     // Brain — siehe `laden()`.
                     ohneSysteme: !('apps' in roh) && Array.isArray(roh.lokal),
+                    mitPins: Array.isArray(roh.pins),
                 };
             }
 

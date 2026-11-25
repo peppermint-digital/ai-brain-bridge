@@ -18,6 +18,10 @@ abstract class OhneLoginTestCase extends TestCase
         $app['config']->set('ai-brain-bridge.base_url', 'https://brain.test');
         $app['config']->set('ai-brain-bridge.login.enabled', false);
         $app['config']->set('ai-brain-bridge.switcher.enabled', true);
+        // Favoriten ausdruecklich in AI Brain: der Stand bis pm #10219. Seither
+        // liegen sie ohne Anmeldeweg nach Vorgabe im Produkt — das pruefen die
+        // Tests unter tests/Favoriten.
+        $app['config']->set('ai-brain-bridge.switcher.pins.store', 'brain');
         $app['config']->set('ai-brain-bridge.oauth.client_id', 'maschinen-client');
         $app['config']->set('ai-brain-bridge.oauth.client_secret', 'maschinen-geheimnis');
         $app['config']->set('auth.providers.users.model', \OhneLoginNutzer::class);

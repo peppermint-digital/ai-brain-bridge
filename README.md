@@ -353,11 +353,69 @@ Das war alles. Die Leiste selbst liefert das Paket aus; sie laeuft in React- und
 Blade-Anwendungen gleich, weil sie ein Web-Component in reinem JavaScript ist —
 ohne Bauschritt in der einbindenden Anwendung.
 
-**Ohne `AI_BRAIN_LOGIN`** zeigt sie nur die eigenen Eintraege des Produkts (siehe
-unten) — keine Systeme aus AI Brain, keinen Merkzettel, keine Postfach-Kachel, und
-die Route `/auth/brain/go` gibt es nicht: Ein Knopf in ein anderes System endete
-ohne gemeinsamen Anmeldeweg auf einer Anmeldemaske. Bis pm #10190 blieb die Leiste
-dann ganz weg, auch mit den Modulen des Produkts.
+**Ohne `AI_BRAIN_LOGIN`** zeigt sie die eigenen Eintraege des Produkts (siehe
+unten) und die Favoriten des Produkts. Die Systeme aus AI Brain (heute: der Weg zu
+AI Brain selbst) erscheinen nur fuer ein **verbundenes Konto** (siehe naechster
+Abschnitt). Keine Postfach-Kachel, und die Route `/auth/brain/go` gibt es nicht.
+Bis pm #10190 blieb die Leiste ohne Anmeldeweg ganz weg, bis pm #10219 ohne
+Favoriten und ohne AI Brain.
+
+### Favoriten (Stern) — im Produkt
+
+Seit pm #10219 haelt jedes System seine Favoriten selbst, in der Tabelle
+`switcher_pins` (Migration im Paket), fuer jede angemeldete Person:
+
+```env
+AI_BRAIN_SWITCHER_PINS_STORE=local   # Vorgabe: local ohne AI_BRAIN_LOGIN, brain mit
+AI_BRAIN_SWITCHER_PINS_MAX=12
+AI_BRAIN_SWITCHER_FARBE=#10b981      # Streifen; ohne Angabe aus dem Produkt-Slug
+```
+
+Nur Adressen dieses Produkts (`APP_URL`), jede nur einmal je Person, Symbol aus
+der Liste der Leiste. Endpunkt und Antworten sind dieselben wie in AI Brain; die
+Leiste merkt keinen Unterschied. Fehlt die Tabelle (Deploy vor `migrate`),
+erscheinen keine Favoriten — die Seite laedt trotzdem. Nach dem Umstellen auf
+`local` also `php artisan migrate`.
+
+**Uebernahme aus AI Brain:** `php artisan ai-brain:favoriten-uebernehmen` zaehlt
+(Trockenlauf). Mit `--ausfuehren` schreibt er: je verbundener Person, in ihrem
+Namen gelesen, nur Adressen dieses Produkts, mit Name, Symbol und Reihenfolge;
+danach Gegenprobe Quelle = Ziel. Antwortet AI Brain fuer eine Person nicht, wird
+nichts geschrieben. Die neuen Zeilen stehen in `storage/app/ai-brain-favoriten/`,
+`--zuruecknehmen=<datei>` entfernt genau sie. AI Brain selbst bleibt unveraendert.
+
+## Konto mit AI Brain verbunden — ein Schalter fuer alle Pakete
+
+Funktionen, die es nur mit AI Brain gibt, fragen an **einer** Stelle. Ohne
+Verbindung gibt es sie nicht (pm #10219). Der erste Nutzer ist die Leiste: Nur
+ein verbundenes Konto sieht dort AI Brain.
+
+```php
+Gate::allows('ai-brain.verbunden');      // jedes Paket, ohne Abhaengigkeit auf die Bruecke
+$person->can('ai-brain.verbunden');
+AiBrain::istVerbunden($person);          // ohne Angabe: die angemeldete Person
+```
+
+```blade
+@can('ai-brain.verbunden') … @endcan
+```
+
+Ohne Bruecke ist die Faehigkeit nicht definiert, und Laravel antwortet `false`.
+Wer Persoenliches aus AI Brain zeigt, fragt **vor** dem Abruf: Ohne handelnde
+Person ruft die Bruecke als Dienstkonto auf.
+
+**Vorgabe** (`SpaltenKontoverbindung`): Mit `AI_BRAIN_LOGIN` ist jede angemeldete
+Person verbunden — sie kommt aus AI Brain. Sonst entscheidet die Spalte
+`ai_brain_user_id` (`AI_BRAIN_VERBINDUNG_SPALTE`), gesetzt beim Verbinden (siehe
+oben). Eine verbundene Person tritt in AI Brain mit `ai_brain_email`
+(`AI_BRAIN_VERBINDUNG_ADRESSE_SPALTE`) auf, wenn vorhanden — das ist auch die
+Vorgabe fuer die handelnde Person aller Aufrufe. Eigene Regel:
+
+```php
+$this->app->bind(\Peppermint\AiBrainBridge\Kontoverbindung::class, MeineRegel::class);
+```
+
+Gate, Fassade, handelnde Person und Leiste folgen dann alle dieser Bindung.
 
 **Was beim Klick passiert.** Der Knopf zeigt auf `/auth/brain/go` des Ziels:
 Sitzung vorhanden → sofort weiter, sonst → durch den Anmeldeweg. Wohin es geht,
