@@ -31,6 +31,18 @@ class Kontomeldung
 
         $nutzlast = self::nutzlast($person);
 
+        // Einmal je Aufruf und Stand: Verbindet die Person ueber die Bruecke,
+        // meldet der Controller — und ein Produkt mit eigenem Beobachter an
+        // der Spalte ebenfalls. Gemerkt wird im Container, also je Anfrage.
+        $schluessel = $nutzlast['product_user_id'].':'.($nutzlast['brain_user_id'] ?? '-');
+        $gemeldet = app()->bound(self::class.'.gemeldet') ? app(self::class.'.gemeldet') : [];
+
+        if (in_array($schluessel, $gemeldet, true)) {
+            return;
+        }
+
+        app()->instance(self::class.'.gemeldet', [...$gemeldet, $schluessel]);
+
         dispatch(static function () use ($nutzlast): void {
             try {
                 app(AiBrainManager::class)->emit(self::ART, $nutzlast, 'user:'.$nutzlast['product_user_id']);

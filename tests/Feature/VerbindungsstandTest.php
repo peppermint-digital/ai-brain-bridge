@@ -84,3 +84,14 @@ it('meldet AI Brain die Produktkennung und die verbundene Person, getrennt als n
     expect(Kontomeldung::nutzlast($this->verbunden))->toBe(['product_user_id' => (string) $this->verbunden->id, 'brain_user_id' => '7'])
         ->and(Kontomeldung::nutzlast($this->allein))->toBe(['product_user_id' => (string) $this->allein->id, 'brain_user_id' => null]);
 });
+
+it('meldet denselben Stand in einem Aufruf nur einmal', function () {
+    Illuminate\Support\Facades\Bus::fake();
+
+    Kontomeldung::melden($this->verbunden);
+    Kontomeldung::melden($this->verbunden->fresh());
+    $this->verbunden->forceFill(['ai_brain_user_id' => null])->save();
+    Kontomeldung::melden($this->verbunden);
+
+    Illuminate\Support\Facades\Bus::assertDispatchedAfterResponseTimes(Illuminate\Queue\CallQueuedClosure::class, 2);
+});
