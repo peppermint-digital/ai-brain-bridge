@@ -40,7 +40,7 @@
 (() => {
     'use strict';
 
-    const VERSION = '1.11.0';
+    const VERSION = '1.12.0';
 
     /**
      * Die Symbole, die ein Merkzettel tragen kann (#5320).
@@ -56,32 +56,37 @@
      * hier durch und der Merkzettel zeigt wieder seine Anfangsbuchstaben.
      *
      * Alle Pfade zeichnen in `currentColor` und ohne Fuellung — damit sie in
-     * hell und dunkel gleich gut sitzen und die Farbe des Systems, die als
-     * Streifen unter der Kachel liegt, nicht stoeren.
+     * hell und dunkel gleich gut sitzen.
+     *
+     * Seit 1.12.0 (pm #10219) sind es die Formen von Lucide (ISC-Lizenz,
+     * lucide.dev) — dieselben, die die Produkte in ihrer Seitenleiste zeigen.
+     * Eingebettet statt geladen: Die Leiste hat keinen Bauschritt. Jeder Wert
+     * ist der Inhalt eines 24er-`<svg>` und steht ausschliesslich HIER, nie in
+     * Daten.
      */
     const SYMBOLE = {
-        mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
-        kalender: 'M4 6h16v14H4zM8 3v4M16 3v4M4 10h16',
-        datei: 'M6 3h8l4 4v14H6zM14 3v5h4',
-        ordner: 'M3 7h6l2 2h10v10H3z',
-        person: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c0-4 4-6 8-6s8 2 8 6',
-        gruppe: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 19c0-3.3 3.1-5 7-5s7 1.7 7 5M17 6.2a3 3 0 0 1 0 5.6M18 14.5c2.4.6 4 2 4 4.5',
-        haus: 'M4 11l8-7 8 7M6 10v10h12V10',
-        stern: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z',
-        herz: 'M12 20S4.5 15.3 4.5 10.3A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7.5 2.3C19.5 15.3 12 20 12 20z',
-        fahne: 'M6 3v18M6 4h12l-2.5 4L18 12H6',
-        lupe: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM16.2 16.2L21 21',
-        uhr: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3.2 2',
-        chat: 'M4 5h16v11H9l-5 4z',
-        telefon: 'M6.5 3h3.2l1.8 4.4-2.4 1.5a12.5 12.5 0 0 0 5.9 5.9l1.5-2.4L21 14.3v3.2a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.2 2 2 0 0 1 6.5 3z',
-        ort: 'M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
-        euro: 'M17.5 6.5a7 7 0 1 0 0 11M4 10h9M4 14h9',
-        diagramm: 'M4 20V10M10 20V4M16 20v-7M3 20h18',
-        haken: 'M4 12.5l5 5L20 6.5',
-        regler: 'M4 8h7M15 8h5M4 16h5M13 16h7M13 5.5v5M9 13.5v5',
-        buch: 'M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM17 7h2v13H8',
-        paket: 'M12 3l8 4v10l-8 4-8-4V7zM4 7l8 4 8-4M12 11v10',
-        gluehbirne: 'M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z',
+        mail: '<path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/>',
+        kalender: '<path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/>',
+        datei: '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+        ordner: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+        person: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        gruppe: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>',
+        haus: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+        stern: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
+        herz: '<path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"/>',
+        fahne: '<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/>',
+        lupe: '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+        uhr: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+        chat: '<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>',
+        telefon: '<path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/>',
+        ort: '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+        euro: '<path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/>',
+        diagramm: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+        haken: '<path d="M21 10.656V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.344"/><path d="m9 11 3 3L22 4"/>',
+        regler: '<path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>',
+        buch: '<path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/>',
+        paket: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/>',
+        gluehbirne: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
     };
 
     /**
@@ -124,7 +129,10 @@
      * meinte dort nur deren eigene Meldungen. Hier geht es um den Posteingang
      * ueber alle Systeme hinweg, und ein neuer Ort verdient ein eigenes Bild.
      */
-    const POSTFACH_PFAD = 'M3 12h4l1 2h8l1-2h4M3 12l2-7h14l2 7v6H3zM9 8h6';
+    const POSTFACH_SYMBOL = '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>';
+
+    /** Lucide `plus` — fuer das Anpinnen. */
+    const PLUS_SYMBOL = '<path d="M5 12h14"/><path d="M12 5v14"/>';
 
     /** Wie oft der Zaehler nachgefragt wird. */
     const POSTFACH_TAKT = 60 * 1000;
@@ -531,11 +539,9 @@
                 <a class="knopf postfach" href="${this.sicher(this.getAttribute('postfach'))}"
                    aria-label="${this.sicher(beschriftung)}">
                     <span class="kachel postfach-kachel">
-                        <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
-                             stroke="currentColor" stroke-width="1.7"
-                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="${POSTFACH_PFAD}"></path>
-                        </svg>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+                             stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${POSTFACH_SYMBOL}</svg>
                         ${abzeichen}
                     </span>
                     <span class="hinweis" role="tooltip">${this.sicher(beschriftung)}</span>
@@ -644,15 +650,15 @@
          * aussen.
          */
         symbolBild(schluessel) {
-            const pfad = SYMBOLE[schluessel];
+            const form = SYMBOLE[schluessel];
 
-            if (!pfad) {
+            if (!form) {
                 return '';
             }
 
             return `<svg class="symbol" viewBox="0 0 24 24" fill="none" aria-hidden="true"
-                         stroke="currentColor" stroke-width="1.7"
-                         stroke-linecap="round" stroke-linejoin="round"><path d="${pfad}"/></svg>`;
+                         stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round">${form}</svg>`;
         }
 
         pinKuerzel(label) {
@@ -766,7 +772,9 @@
                 <button class="anpinnen${drin ? ' ist-drin' : ''}" type="button"
                         aria-pressed="${drin ? 'true' : 'false'}"
                         aria-label="${this.sicher(text)}">
-                    <span class="plus" aria-hidden="true">+</span>
+                    <svg class="plus" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round" aria-hidden="true">${PLUS_SYMBOL}</svg>
                     <span class="hinweis" role="tooltip">${this.sicher(text)}</span>
                 </button>`;
         }
@@ -1213,13 +1221,21 @@
         geruest() {
             return `
 <style>
+    /*
+     * Die Stil-Schalter. Ein Produkt kann jeden davon von aussen setzen
+     * (peppermint-app-switcher { --akzent: … }). Die Werte folgen seit
+     * 1.12.0 (pm #10219) der neutralen Palette von shadcn/ui (zinc): Flaeche,
+     * feiner Rand, --akzent fuer Zeigen und Aktiv, --ring fuer den Fokus.
+     */
     :host {
         --grund: #ffffff;
-        --rand: rgba(15, 23, 42, 0.12);
-        --griff: rgba(15, 23, 42, 0.22);
-        --schrift: #0f172a;
-        --gedaempft: rgba(15, 23, 42, 0.45);
-        --schatten: 0 12px 28px -12px rgba(15, 23, 42, 0.35);
+        --rand: #e4e4e7;
+        --griff: rgba(9, 9, 11, 0.22);
+        --schrift: #09090b;
+        --gedaempft: #71717a;
+        --akzent: #f4f4f5;
+        --ring: rgba(161, 161, 170, 0.55);
+        --schatten: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
 
         position: fixed;
         top: 0;
@@ -1230,12 +1246,14 @@
     }
 
     :host(.dunkel) {
-        --grund: #17181c;
-        --rand: rgba(255, 255, 255, 0.14);
+        --grund: #09090b;
+        --rand: rgba(255, 255, 255, 0.1);
         --griff: rgba(255, 255, 255, 0.3);
-        --schrift: #f1f5f9;
-        --gedaempft: rgba(241, 245, 249, 0.5);
-        --schatten: 0 12px 28px -12px rgba(0, 0, 0, 0.8);
+        --schrift: #fafafa;
+        --gedaempft: #a1a1aa;
+        --akzent: #27272a;
+        --ring: rgba(113, 113, 122, 0.6);
+        --schatten: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
     }
 
     /* Geschlossen nur ein schmaler Streifen — er darf der Seite darunter
@@ -1282,11 +1300,11 @@
 
     .leiste {
         display: flex;
-        gap: 6px;
+        gap: 4px;
         margin-top: 8px;
-        padding: 8px;
+        padding: 6px;
         border: 1px solid var(--rand);
-        border-radius: 18px;
+        border-radius: 12px;
         background: var(--grund);
         box-shadow: var(--schatten);
         opacity: 0;
@@ -1298,29 +1316,38 @@
 
     .wrap.offen .leiste { opacity: 1; transform: translateY(0); }
 
+    /*
+     * Ein Knopf wie in shadcn/ui (Button variant="ghost" size="icon"):
+     * keine eigene Flaeche, beim Zeigen und als „hier" die Akzentflaeche, der
+     * Fokus als Ring. Bis 1.12.0 trug jede Kachel unten einen farbigen
+     * Streifen; Bastian (25.11.2026): „Dieser untere Schatten in Farbe gefaellt
+     * mir irgendwie auch nicht." Die Farbe des Systems bleibt als Punkt.
+     */
     .knopf {
         position: relative;
         display: block;
         text-decoration: none;
-        border-radius: 12px;
+        border-radius: 8px;
+        outline: none;
     }
-
-    .knopf:focus-visible { outline: 2px solid var(--gedaempft); outline-offset: 3px; }
 
     .kachel {
         position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
         color: var(--gedaempft);
         font-size: 12px;
         font-weight: 600;
         letter-spacing: 0.02em;
-        transition: transform 140ms ease, background 140ms ease;
+        transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
     }
+
+    .knopf:focus-visible .kachel,
+    .knopf:focus-visible .pin-kachel { box-shadow: 0 0 0 3px var(--ring); }
 
     /* Das Kuerzel ist der Ersatz fuer ein fehlendes Logo, nicht sein Nachbar.
        Sichtbar wird es erst, wenn die Marke nicht kommt — dann setzt die
@@ -1342,11 +1369,11 @@
      * Liste auf /logo.svg und nicht auf das App-Icon.
      */
     .kachel img {
-        width: calc(22px * var(--skalierung, 1));
-        height: calc(22px * var(--skalierung, 1));
+        width: calc(18px * var(--skalierung, 1));
+        height: calc(18px * var(--skalierung, 1));
         object-fit: contain;
         filter: brightness(0);
-        opacity: 0.62;
+        opacity: 0.6;
         transition: opacity 140ms ease;
     }
 
@@ -1354,8 +1381,8 @@
 
     .knopf:hover .kachel,
     .knopf:focus-visible .kachel {
-        transform: scale(1.06);
-        background: var(--rand);
+        background: var(--akzent);
+        color: var(--schrift);
     }
 
     .knopf:hover .kachel img,
@@ -1363,27 +1390,37 @@
 
     /* Wo man gerade ist, wird gezeigt, nicht angeboten. */
     .knopf.ist-hier { cursor: default; }
-    .knopf.ist-hier .kachel { background: var(--rand); }
+    .knopf.ist-hier .kachel {
+        background: var(--akzent);
+        color: var(--schrift);
+        box-shadow: inset 0 0 0 1px var(--rand);
+    }
     .knopf.ist-hier .kachel img { opacity: 1; }
-    .knopf.ist-hier:hover .kachel { transform: none; }
 
     /*
      * Das Postfach sieht aus wie ein System — gleiche Kachel, gleiche Groesse
      * —, hat aber kein Logo, sondern ein gezeichnetes Symbol. Es steht links
      * und gehoert damit sichtbar zur Leiste und nicht zu den Merkzetteln.
      */
-    .postfach-kachel svg { opacity: 0.62; transition: opacity 140ms ease; }
+    .postfach-kachel svg { display: block; }
 
-    /* Ein Modul des Produkts: Kachel wie ein System, Symbol statt Logo, und
-       unten der Farbstreifen des Moduls wie bei den Merkzetteln. */
-    .modul-kachel { box-shadow: inset 0 -3px 0 0 var(--farbe, transparent); }
-    .modul-kachel .symbol { width: 20px; height: 20px; opacity: 0.62; transition: opacity 140ms ease; }
-    .knopf.modul:hover .modul-kachel .symbol,
-    .knopf.modul:focus-visible .modul-kachel .symbol,
-    .knopf.modul.ist-hier .modul-kachel .symbol { opacity: 1; }
+    /* Ein Modul des Produkts und ein Merkzettel: Symbol statt Logo, die Farbe
+       des Moduls bzw. Systems als Punkt unten rechts. Der Rand in der
+       Grundfarbe setzt ihn auch auf der Akzentflaeche ab. */
+    .modul-kachel::after,
+    .pin-kachel::after {
+        content: '';
+        position: absolute;
+        right: 5px;
+        bottom: 5px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--farbe, var(--gedaempft));
+        box-shadow: 0 0 0 1.5px var(--grund);
+    }
+    .modul-kachel:not([style*='--farbe: #'])::after { display: none; }
     .kuerzel-modul { line-height: 1; }
-    .knopf.postfach:hover .postfach-kachel svg,
-    .knopf.postfach:focus-visible .postfach-kachel svg { opacity: 1; }
 
     /*
      * Das Abzeichen sitzt AUF der Kachel und nicht daneben: Die Leiste ist
@@ -1430,24 +1467,23 @@
     .pin-huelle { position: relative; display: block; }
 
     .pin-kachel {
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 34px;
-        height: 38px;
-        border-radius: 10px;
-        background: var(--rand);
-        color: var(--schrift);
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--gedaempft);
         font-size: 11px;
         font-weight: 600;
         letter-spacing: 0.02em;
-        /* Der farbige Streifen sagt, in welchem System die Seite liegt. */
-        box-shadow: inset 0 -3px 0 0 var(--farbe, #64748b);
-        transition: transform 140ms ease;
+        transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
     }
 
     .knopf.pin:hover .pin-kachel,
-    .knopf.pin:focus-visible .pin-kachel { transform: scale(1.06); }
+    .knopf.pin:focus-visible .pin-kachel { background: var(--akzent); color: var(--schrift); }
 
     /* Das Entfernen taucht erst auf, wenn man den Merkzettel meint. */
     .loesen {
@@ -1500,19 +1536,21 @@
         align-items: center;
         justify-content: center;
         position: relative;
-        width: 34px;
-        height: 38px;
+        width: 36px;
+        height: 36px;
         padding: 0;
         border: 1px dashed var(--rand);
-        border-radius: 10px;
+        border-radius: 8px;
         background: none;
         color: var(--gedaempft);
         cursor: pointer;
-        transition: color 140ms ease, border-color 140ms ease;
+        outline: none;
+        transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
     }
 
     .anpinnen:hover,
-    .anpinnen:focus-visible { color: var(--schrift); border-color: var(--gedaempft); }
+    .anpinnen:focus-visible { color: var(--schrift); background: var(--akzent); }
+    .anpinnen:focus-visible { box-shadow: 0 0 0 3px var(--ring); }
 
     /* Schon angepinnt: im Ruhezustand nicht zu unterscheiden — erst beim
        Zeigen dreht sich das Plus zum Kreuz und der Hinweis sagt, was ein Klick
@@ -1522,22 +1560,24 @@
     .anpinnen.ist-drin:hover .plus,
     .anpinnen.ist-drin:focus-visible .plus { transform: rotate(45deg); }
 
-    .plus { font-size: 16px; line-height: 1; }
+    .plus { display: block; }
 
     /* Das Namensfeld steht an der Stelle des Plus — die Leiste waechst kurz,
        statt ein Fenster aufzumachen. */
     .eingabe {
         width: 150px;
-        height: 38px;
+        height: 36px;
         padding: 0 10px;
-        border: 1px solid var(--gedaempft);
-        border-radius: 10px;
+        border: 1px solid var(--rand);
+        border-radius: 8px;
         background: var(--grund);
         color: var(--schrift);
         font: inherit;
         font-size: 12px;
         outline: none;
     }
+
+    .eingabe:focus { box-shadow: 0 0 0 3px var(--ring); }
 
     .eingabe::placeholder { color: var(--gedaempft); }
 
@@ -1573,7 +1613,7 @@
         border: 1px solid var(--rand);
         border-radius: 12px;
         background: var(--grund);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+        box-shadow: var(--schatten);
     }
 
     .symbolknopf {
@@ -1593,15 +1633,18 @@
     .symbolknopf:hover,
     .symbolknopf:focus-visible {
         color: var(--schrift);
-        background: var(--rand);
+        background: var(--akzent);
+        outline: none;
     }
+
+    .symbolknopf:focus-visible { box-shadow: 0 0 0 3px var(--ring); }
 
     /* Das Gewaehlte muss sich auch ohne Farbe unterscheiden — deshalb Rahmen
        UND Flaeche, nicht nur ein Farbton. */
     .symbolknopf.gewaehlt {
         color: var(--schrift);
-        border-color: var(--gedaempft);
-        background: var(--rand);
+        border-color: var(--rand);
+        background: var(--akzent);
     }
 
 
@@ -1612,8 +1655,8 @@
         top: calc(100% + 10px);
         left: 50%;
         transform: translateX(-50%) translateY(-4px);
-        padding: 4px 9px;
-        border-radius: 8px;
+        padding: 4px 8px;
+        border-radius: 6px;
         background: var(--schrift);
         color: var(--grund);
         font-size: 11px;
@@ -1677,7 +1720,7 @@
             align-items: center;
             justify-content: center;
             border: 1px solid var(--rand);
-            border-radius: 14px;
+            border-radius: 12px;
             background: var(--grund);
             color: var(--schrift);
             box-shadow: var(--schatten);
