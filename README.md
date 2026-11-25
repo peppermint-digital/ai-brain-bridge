@@ -356,7 +356,9 @@ ohne Bauschritt in der einbindenden Anwendung.
 **Ohne `AI_BRAIN_LOGIN`** zeigt sie die eigenen Eintraege des Produkts (siehe
 unten) und die Favoriten des Produkts. Die Systeme aus AI Brain (heute: der Weg zu
 AI Brain selbst) erscheinen nur fuer ein **verbundenes Konto** (siehe naechster
-Abschnitt). Keine Postfach-Kachel, und die Route `/auth/brain/go` gibt es nicht.
+Abschnitt). Keine Postfach-Kachel. `/auth/brain/go` fuehrt ohne Sitzung auf die
+eigene Anmeldemaske des Produkts, mit dem Ziel als „intended" (AI Brain #10249;
+bis dahin gab es die Route nicht, und der Knopf in AI Brain endete auf einer 404).
 Bis pm #10190 blieb die Leiste ohne Anmeldeweg ganz weg, bis pm #10219 ohne
 Favoriten und ohne AI Brain.
 
