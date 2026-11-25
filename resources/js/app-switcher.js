@@ -685,7 +685,9 @@
          */
         titelKuerzen(titel) {
             const hier = this.apps.find((app) => app.aktuell === true);
-            const name = hier?.name ?? '';
+            // Ohne Liste aus AI Brain (Konto nicht verbunden, pm #10219)
+            // nennt das Produkt seinen Namen selbst.
+            const name = hier?.name ?? this.getAttribute('anwendung') ?? '';
             let text = String(titel ?? '').trim();
 
             if (name !== '') {
@@ -962,8 +964,8 @@
                 }
 
                 this.pins = this.pins.map((p) => (String(p.id) === String(id) ? geaendert : p));
-                this.inSpeicher({ apps: this.apps, pins: this.pins });
-                this.zeichnen({ apps: this.apps, pins: this.pins });
+                this.inSpeicher({ apps: this.apps, pins: this.pins, lokal: this.lokal });
+                this.zeichnen({ apps: this.apps, pins: this.pins, lokal: this.lokal });
             }, pin.symbol ?? null);
 
             feld.focus();
@@ -972,7 +974,7 @@
 
         abbrechen() {
             this.bearbeitet = false;
-            this.zeichnen({ apps: this.apps, pins: this.pins });
+            this.zeichnen({ apps: this.apps, pins: this.pins, lokal: this.lokal });
         }
 
         /**
@@ -996,8 +998,8 @@
             }
 
             this.pins = [...this.pins, neuerPin];
-            this.inSpeicher({ apps: this.apps, pins: this.pins });
-            this.zeichnen({ apps: this.apps, pins: this.pins });
+            this.inSpeicher({ apps: this.apps, pins: this.pins, lokal: this.lokal });
+            this.zeichnen({ apps: this.apps, pins: this.pins, lokal: this.lokal });
         }
 
         async loesen(id) {
@@ -1006,8 +1008,8 @@
             }
 
             this.pins = this.pins.filter((pin) => String(pin.id) !== String(id));
-            this.inSpeicher({ apps: this.apps, pins: this.pins });
-            this.zeichnen({ apps: this.apps, pins: this.pins });
+            this.inSpeicher({ apps: this.apps, pins: this.pins, lokal: this.lokal });
+            this.zeichnen({ apps: this.apps, pins: this.pins, lokal: this.lokal });
         }
 
         /**

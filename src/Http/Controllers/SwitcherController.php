@@ -392,9 +392,13 @@ class SwitcherController
 
         $postfach = $this->postfach();
 
+        // Der Name der Anwendung, damit die Leiste ihn aus Seitentiteln
+        // kuerzen kann, auch ohne Liste aus AI Brain (pm #10219).
+        $anwendung = e((string) config('app.name'));
+
         return <<<HTML
             <script src="{$script}" defer></script>
-            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}"{$pins}{$postfach}{$liste}></peppermint-app-switcher>
+            <peppermint-app-switcher endpoint="{$endpunkt}" aktuell="{$slug}" anwendung="{$anwendung}"{$pins}{$postfach}{$liste}></peppermint-app-switcher>
             HTML;
     }
 

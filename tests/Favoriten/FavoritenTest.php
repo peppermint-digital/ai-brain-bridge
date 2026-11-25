@@ -211,7 +211,9 @@ it('schreibt die Leiste mit Stern und den Favoriten ins Layout, ohne zu AI Brain
         ->and($markup)->toContain('Projekt 4')
         // Ausdruecklich leere Systeme: Sonst naehme die Leiste eine alte Liste
         // aus dem Sitzungsspeicher des Browsers — womoeglich mit AI Brain.
-        ->and($markup)->toContain('&quot;apps&quot;:[]');
+        ->and($markup)->toContain('&quot;apps&quot;:[]')
+        // Damit „Dashboard - Peppermint Manager" als „Dashboard" vorgeschlagen wird.
+        ->and($markup)->toContain('anwendung="'.e(config('app.name')).'"');
     Http::assertNothingSent();
 });
 
