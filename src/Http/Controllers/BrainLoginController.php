@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Peppermint\AiBrainBridge\Auth\BrainLogin;
+use Peppermint\AiBrainBridge\Verbund\Kontomeldung;
 
 /**
  * „Mit AI Brain anmelden" (AI Brain #5266).
@@ -237,6 +238,11 @@ class BrainLoginController
         if ($fehler !== null) {
             return $this->zurueckMitFehler($fehler);
         }
+
+        // AI Brain sofort Bescheid geben, nicht erst bei der naechsten
+        // Messung (pm #10265). Gelesen wird die Person frisch — der Verbinder
+        // hat die Spalte eben erst geschrieben.
+        Kontomeldung::melden(method_exists($user, 'fresh') ? ($user->fresh() ?? $user) : $user);
 
         return redirect()->to($config['connect_after'])
             ->with('status', 'Dein Konto ist jetzt mit AI Brain verbunden.');

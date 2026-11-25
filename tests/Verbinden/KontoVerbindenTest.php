@@ -158,3 +158,31 @@ it('meldet über den Rückruf niemanden an, solange die gemeinsame Anmeldung aus
     expect(auth()->check())->toBeFalse();
     Http::assertNothingSent();
 });
+
+it('meldet AI Brain die neue Verbindung als Ereignis (pm #10265)', function () {
+    config(['ai-brain-bridge.verbindung.spalte' => 'brain_id', 'ai-brain-bridge.source' => 'produkt-test']);
+    $person = VerbindenTestUser::create(['name' => 'A', 'email' => 'a@example.com']);
+    brainNenntPerson(42, 'a@example.com');
+    Http::fake(['brain.test/api/v1/events' => Http::response(['ok' => true], 202)]);
+
+    $this->actingAs($person)
+        ->withSession(['ai_brain_login.state' => 's', 'ai_brain_login.verifier' => 'v', 'ai_brain_login.zweck' => 'verbinden', 'ai_brain_login.verbinder' => $person->id])
+        ->get('/auth/brain/callback?code=abc&state=s')
+        ->assertRedirect('/einstellungen/ai-brain');
+
+    Http::assertSent(fn ($anfrage) => str_ends_with($anfrage->url(), '/api/v1/events')
+        && $anfrage['type'] === 'konto.verbindung'
+        && $anfrage['payload'] === ['product_user_id' => (string) $person->id, 'brain_user_id' => '42']);
+});
+
+it('meldet nichts, wenn das Verbinden scheitert', function () {
+    $person = VerbindenTestUser::create(['name' => 'A', 'email' => 'a@example.com']);
+    BrainLogin::verbindeUsing(fn () => 'nein');
+    brainNenntPerson(42, 'a@example.com');
+
+    $this->actingAs($person)
+        ->withSession(['ai_brain_login.state' => 's', 'ai_brain_login.verifier' => 'v', 'ai_brain_login.zweck' => 'verbinden', 'ai_brain_login.verbinder' => $person->id])
+        ->get('/auth/brain/callback?code=abc&state=s');
+
+    Http::assertNotSent(fn ($anfrage) => str_ends_with($anfrage->url(), '/api/v1/events'));
+});

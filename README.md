@@ -502,6 +502,29 @@ Route::get('/', function () {
 })->name('home');
 ```
 
+### Anzeige „verbunden" im Personen-Menue (pm #10265)
+
+`Peppermint\AiBrainBridge\Verbund\Verbindungsstand` liefert fuer die angemeldete
+Person eine Liste — ein Eintrag je anderem System, fertig fuer die Oberflaeche:
+
+```php
+// HandleInertiaRequests::share()
+'verbund' => fn () => app(Verbindungsstand::class)->fuer($request->user()),
+// [['system' => 'AI Brain', 'verbunden' => true, 'text' => 'Mit AI Brain verbunden', 'url' => '/settings/ai-brain']]
+```
+
+- Produkt: Vorgabe `BrueckenVerbindungsstand` — fragt `Kontoverbindung`, also dieselbe
+  Stelle wie Gate und Leiste. Ohne eingerichtete Bruecke: leere Liste, die Oberflaeche
+  zeigt nichts. Name und Ziel-Route: `verbindung.anzeige_name`,
+  `verbindung.einstellungen_route` (Vorgabe `settings.ai-brain`; fehlt sie, `url` null).
+- Hub (AI Brain): bindet seine eigene Umsetzung (`bindIf`), dort liegen die Produkte.
+
+**Die Wahrheit ist die Spalte im Produkt.** AI Brain misst sie ueber `users.list`
+(Feld `ai_brain_user_id`). Damit es nicht bis zur naechsten Messung nachlaeuft, meldet
+`Verbund\Kontomeldung::melden($person)` das Ereignis `konto.verbindung`
+(`{product_user_id, brain_user_id|null}`) nach der Antwort. Das Verbinden ueber
+`/auth/brain/verbinden` ruft es selbst; das Trennen liegt im Produkt und ruft es dort.
+
 ## Status
 v0.1.
 

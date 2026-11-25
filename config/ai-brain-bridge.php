@@ -221,6 +221,10 @@ return [
         // Mit welcher Adresse die Bruecke fuer eine verbundene Person in AI
         // Brain auftritt — dort darf sie anders heissen als hier.
         'adresse_spalte' => env('AI_BRAIN_VERBINDUNG_ADRESSE_SPALTE', 'ai_brain_email'),
+        // Anzeige im Personen-Menue (pm #10265): wie das andere System heisst
+        // und welche Route der Klick oeffnet (Einstellungen der Verbindung).
+        'anzeige_name' => env('AI_BRAIN_VERBINDUNG_ANZEIGE_NAME', 'AI Brain'),
+        'einstellungen_route' => env('AI_BRAIN_VERBINDUNG_EINSTELLUNGEN_ROUTE', 'settings.ai-brain'),
     ],
 
     /*

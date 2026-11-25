@@ -36,6 +36,8 @@ use Peppermint\AiBrainBridge\Http\Middleware\BeschraenkeKanalWerkzeuge;
 use Peppermint\AiBrainBridge\Http\Middleware\ResolveAiBrainActingUser;
 use Peppermint\AiBrainBridge\Http\Middleware\VerifyAiBrainSignature;
 use Peppermint\AiBrainBridge\Switcher\Favoriten;
+use Peppermint\AiBrainBridge\Verbund\BrueckenVerbindungsstand;
+use Peppermint\AiBrainBridge\Verbund\Verbindungsstand;
 
 class AiBrainBridgeServiceProvider extends ServiceProvider
 {
@@ -65,6 +67,10 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         // Konto mit AI Brain verbunden? (pm #10219) — `bindIf`, damit ein
         // Produkt mit eigener Regel gewinnt, egal in welcher Reihenfolge.
         $this->app->bindIf(Kontoverbindung::class, SpaltenKontoverbindung::class);
+
+        // Anzeige „verbunden" im Personen-Menue (pm #10265). Der Hub bindet
+        // seine eigene Umsetzung — dort liegen die Produkte.
+        $this->app->bindIf(Verbindungsstand::class, BrueckenVerbindungsstand::class);
 
         $this->app->singleton(AiBrainManager::class, fn ($app) => new AiBrainManager(
             (array) config('ai-brain-bridge'),
