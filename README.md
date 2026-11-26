@@ -362,6 +362,22 @@ bis dahin gab es die Route nicht, und der Knopf in AI Brain endete auf einer 404
 Bis pm #10190 blieb die Leiste ohne Anmeldeweg ganz weg, bis pm #10219 ohne
 Favoriten und ohne AI Brain.
 
+### Mit Inertia: nach An- und Abmelden voll neu laden
+
+Die Leiste steht im Blade-Layout, und Inertia schreibt das Layout nach einer
+XHR-Weiterleitung nicht neu. Ohne weiteres Zutun fehlt sie deshalb nach dem
+Anmelden, bis man neu laedt, und nach dem Abmelden steht sie noch ueber der
+Anmeldemaske (pm Bug #1621). Eine Zeile in `bootstrap/app.php`:
+
+```php
+$middleware->web(append: ['ai-brain.leiste-nach-anmeldewechsel']);
+```
+
+Wechselt eine Inertia-Anfrage die angemeldete Person und antwortet mit einer
+Weiterleitung, wird daraus ein `409` mit `X-Inertia-Location`, und der Browser
+laedt das Ziel ganz. Gilt fuer jeden Weg (Passwort, zweiter Faktor, Einladung,
+Abmelden, Impersonate). Anfragen ohne `X-Inertia` bleiben unveraendert `302`.
+
 ### Am Telefon: Ausloeser in der Kopfleiste des Produkts
 
 Ohne weiteres Zutun sitzt die Leiste am Telefon (bis 767 px) als runder Knopf

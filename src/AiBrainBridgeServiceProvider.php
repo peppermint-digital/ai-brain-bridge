@@ -30,6 +30,7 @@ use Peppermint\AiBrainBridge\Http\Controllers\BrainLoginController;
 use Peppermint\AiBrainBridge\Http\Controllers\ConnectController;
 use Peppermint\AiBrainBridge\Http\Controllers\InboundEventController;
 use Peppermint\AiBrainBridge\Http\Controllers\SwitcherController;
+use Peppermint\AiBrainBridge\Http\Middleware\LeisteNachAnmeldewechsel;
 use Peppermint\AiBrainBridge\Http\Middleware\LokalerLoginRiegel;
 use Peppermint\AiBrainBridge\Http\Middleware\NutzerverwaltungRiegel;
 use Peppermint\AiBrainBridge\Http\Middleware\BeschraenkeKanalWerkzeuge;
@@ -152,6 +153,7 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         }
 
         $this->registerLokalenLoginRiegel();
+        $this->registerLeisteNachAnmeldewechsel();
         $this->registerNutzerverwaltungRiegel();
         $this->registerSitzungsEntzug();
         $this->registerInboundRoute();
@@ -402,6 +404,27 @@ class AiBrainBridgeServiceProvider extends ServiceProvider
         $this->app['router']->aliasMiddleware(
             'ai-brain.local-login',
             LokalerLoginRiegel::class,
+        );
+    }
+
+    /**
+     * Nach An- oder Abmelden voll neu laden, damit die Leiste stimmt (pm Bug #1621).
+     *
+     * Wieder nur ein KUERZEL, aus demselben Grund wie beim Anmelde-Riegel:
+     * Ein Paket, das sich still in die Middleware-Kette haengt, laesst spaeter
+     * niemanden finden, warum ein Anmelden die Seite neu laedt. Das Produkt
+     * haengt es an seine `web`-Gruppe:
+     *
+     *     $middleware->web(append: ['ai-brain.leiste-nach-anmeldewechsel']);
+     *
+     * Warum die ganze Gruppe und nicht einzelne Routen: siehe
+     * {@see LeisteNachAnmeldewechsel}.
+     */
+    protected function registerLeisteNachAnmeldewechsel(): void
+    {
+        $this->app['router']->aliasMiddleware(
+            'ai-brain.leiste-nach-anmeldewechsel',
+            LeisteNachAnmeldewechsel::class,
         );
     }
 
